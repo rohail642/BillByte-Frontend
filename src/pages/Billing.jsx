@@ -83,14 +83,22 @@ function ReceiptView({ order, profile }) {
           </tr>
         </thead>
         <tbody>
-          {(order.items || []).map(item => (
-            <tr key={item.id}>
-              <td style={{ paddingBottom: 3, color: '#1c1917' }}>{item.name}</td>
-              <td style={{ textAlign: 'center', color: '#78716c' }}>×{item.quantity}</td>
-              <td style={{ textAlign: 'right', color: '#78716c' }}>₹{item.price}</td>
-              <td style={{ textAlign: 'right', fontWeight: 600, color: '#1c1917' }}>₹{item.total}</td>
-            </tr>
-          ))}
+          {(() => {
+            const grouped = []
+            ;(order.items || []).forEach(item => {
+              const ex = grouped.find(g => g.name === item.name && g.price === item.price)
+              if (ex) { ex.quantity += item.quantity; ex.total += item.total }
+              else grouped.push({ ...item })
+            })
+            return grouped.map((item, i) => (
+              <tr key={i}>
+                <td style={{ paddingBottom: 3, color: '#1c1917' }}>{item.name}</td>
+                <td style={{ textAlign: 'center', color: '#78716c' }}>×{item.quantity}</td>
+                <td style={{ textAlign: 'right', color: '#78716c' }}>₹{item.price}</td>
+                <td style={{ textAlign: 'right', fontWeight: 600, color: '#1c1917' }}>₹{item.total}</td>
+              </tr>
+            ))
+          })()}
         </tbody>
       </table>
 
@@ -152,6 +160,8 @@ export default function Billing() {
   const [addingCust, setAddingCust] = useState(false)
   const [pointsApplied, setPointsApplied] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState(null)
+  const [activeTableView, setActiveTableView] = useState(false)
+  const [selectedTable, setSelectedTable] = useState(null)
 
   const cart     = useCartStore()
   const qc       = useQueryClient()
@@ -176,19 +186,9 @@ export default function Billing() {
   const { data: profile }    = useQuery({ queryKey: ['profile'],   queryFn: getProfile })
   const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 10000 })
 
-  // Check if selected table already has an active order
-  const activeTableData = cart.orderType === 'dine_in' && cart.tableNumber
-    ? (activeTables || []).find(t => String(t.table_number) === String(cart.tableNumber))
-    : null
 
-  // Auto-link to existing order silently when table is occupied
-  useEffect(() => {
-    if (activeTableData && !activeOrderId) {
-      const latestOrder = activeTableData.orders?.[0]
-      if (latestOrder) setActiveOrderId(latestOrder.id)
-    }
-    if (!activeTableData) setActiveOrderId(null)
-  }, [activeTableData?.orders?.[0]?.id])
+
+
 
   const filtered = (menuItems || []).filter(m =>
     (!catFilter || m.category_id === catFilter) &&
@@ -286,14 +286,86 @@ export default function Billing() {
 
   return (
     <div className="h-full flex gap-4 overflow-hidden">
+      {/* ACTIVE TABLES SIDEBAR */}
+      {activeTableView && (
+        <div className="w-60 flex-shrink-0 flex flex-col gap-2 overflow-hidden">
+          <div className="flex items-center justify-between flex-shrink-0">
+            <h3 className="font-display font-bold text-sm text-text">Active Tables</h3>
+            <button onClick={() => { setActiveTableView(false); setSelectedTable(null) }}
+              className="text-xs text-muted hover:text-text transition-colors">✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {(activeTables || []).length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted">No active tables</div>
+            ) : (activeTables || []).map(table => (
+              <div key={table.table_number}
+                onClick={() => setSelectedTable(selectedTable?.table_number === table.table_number ? null : table)}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  selectedTable?.table_number === table.table_number
+                    ? 'bg-green-dim border-green/30'
+                    : 'bg-surface2 border-border hover:border-green/30'
+                }`}>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="font-display font-bold text-sm text-text">Table {table.table_number}</p>
+                  <p className="font-bold text-xs text-green2">{formatINR(table.total_amount)}</p>
+                </div>
+                {table.customer_name && <p className="text-[10px] text-muted mb-1">👤 {table.customer_name}</p>}
+                <p className="text-[10px] text-muted">{table.items_count} items · {table.orders.length} KOT</p>
+
+                {selectedTable?.table_number === table.table_number && (
+                  <div className="mt-2 pt-2 border-t border-border space-y-1">
+                    {table.orders.flatMap(o => o.items).map((item, i) => (
+                      <div key={i} className="flex justify-between text-[10px] text-text2">
+                        <span>{item.name} ×{item.quantity}</span>
+                        <span>{formatINR(item.total)}</span>
+                      </div>
+                    ))}
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        cart.setOrderType('dine_in')
+                        cart.setTableNumber(String(table.table_number))
+                        const latestOrder = table.orders[0]
+                        setActiveOrderId(latestOrder?.id || null)
+                        setActiveTableView(false)
+                        setSelectedTable(null)
+                        toast.success(`Table ${table.table_number} selected — add items and Send KOT`)
+                      }}
+                      className="w-full mt-2 py-1.5 bg-green text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity">
+                      + Add More Items
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* LEFT: Menu */}
       <div className="flex-1 flex flex-col gap-3 overflow-hidden min-w-0">
         <Card className="flex-shrink-0">
-          <input
-            className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-colors"
-            placeholder="🔍  Search menu..."
-            value={search} onChange={e => setSearch(e.target.value)}
-          />
+          <div className="flex gap-2">
+            <input
+              className="flex-1 bg-surface2 border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-colors"
+              placeholder="🔍  Search menu..."
+              value={search} onChange={e => setSearch(e.target.value)}
+            />
+            <button
+              onClick={() => { setActiveTableView(v => !v); setSelectedTable(null) }}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition-all ${
+                activeTableView
+                  ? 'bg-green-dim border-green/30 text-green2'
+                  : 'bg-surface2 border-border text-text2 hover:border-green hover:text-green'
+              }`}>
+              🪑 Tables
+              {(activeTables || []).length > 0 && (
+                <span className="bg-red text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center">
+                  {(activeTables || []).length}
+                </span>
+              )}
+            </button>
+          </div>
           <div className="flex gap-1.5 flex-wrap mt-3">
             <button onClick={() => setCatFilter('')}
               className={clsx('px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
@@ -345,26 +417,9 @@ export default function Billing() {
               <option value="delivery">Delivery</option>
             </Select>
             {cart.orderType === 'dine_in' && (
-              <Select value={cart.tableNumber} onChange={e => {
-                const tNum = e.target.value
-                const occupied = (activeTables || []).find(t => String(t.table_number) === tNum)
-                if (occupied && !activeOrderId) {
-                  // Auto-link to existing order
-                  const latestOrder = occupied.orders?.[0]
-                  if (latestOrder) setActiveOrderId(latestOrder.id)
-                }
-                cart.setTableNumber(tNum)
-              }}>
+              <Select value={cart.tableNumber} onChange={e => cart.setTableNumber(e.target.value)}>
                 <option value="">Table *</option>
-                {Array.from({length:16},(_,i) => {
-                  const tNum = String(i+1)
-                  const occupied = (activeTables || []).find(t => String(t.table_number) === tNum)
-                  return (
-                    <option key={i} value={tNum}>
-                      {occupied ? `🔴 Table ${tNum} (Active)` : `Table ${tNum}`}
-                    </option>
-                  )
-                })}
+                {Array.from({length:16},(_,i) => <option key={i} value={String(i+1)}>Table {i+1}</option>)}
               </Select>
             )}
           </div>

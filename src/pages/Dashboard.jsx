@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getDashboardSummary, getOrders, updateStatus, collectPayment, getActiveTables, removeOrderItem, collectAllForTable, addItemsToOrder } from '../api/orders'
+import { getDashboardSummary, getOrders, updateStatus, collectPayment, getActiveTables, collectAllForTable } from '../api/orders'
 import { getRevenueTrend, getTopDishes } from '../api/reports'
 import { getInventory } from '../api/inventory'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { TrendingUp, ShoppingBag, Receipt, LayoutGrid, CreditCard, X, Plus } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Receipt, LayoutGrid, CreditCard } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -86,34 +86,7 @@ export default function Dashboard() {
     setTableOrder(tableData)
   }
 
-  const removeItemMut = useMutation({
-    mutationFn: ({ orderId, itemId }) => removeOrderItem(orderId, itemId),
-    onMutate: ({ orderId, itemId }) => {
-      setTableOrder(prev => {
-        if (!prev) return prev
-        const updatedOrders = prev.orders.map(o => {
-          if (o.id !== orderId) return o
-          const updatedItems = o.items.filter(i => i.id !== itemId)
-          return { ...o, items: updatedItems }
-        }).filter(o => o.items.length > 0)
-        if (!updatedOrders.length) return null
-        return { ...prev, orders: updatedOrders }
-      })
-    },
-    onSuccess: () => {
-      toast.success('Item removed!')
-      qc.invalidateQueries({ queryKey: ['activeTables'] })
-      qc.invalidateQueries({ queryKey: ['orders'] })
-      qc.invalidateQueries({ queryKey: ['summary'] })
-      // Close if no items left
-      setTableOrder(prev => { if (!prev) { setTableModal(null) } return prev })
-    },
-    onError: (e) => {
-      toast.error(e?.response?.data?.detail || e?.message || 'Failed to remove item')
-      // Revert by refreshing from server
-      qc.invalidateQueries({ queryKey: ['activeTables'] })
-    },
-  })
+
 
   const collectAllMut = useMutation({
     mutationFn: ({ table, method }) => collectAllForTable(table, { payment_method: method, discount_percent: 0 }),
@@ -363,38 +336,9 @@ export default function Dashboard() {
                       <div key={i} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-text">{item.name}</p>
-                          <p className="text-xs text-muted">₹{item.price} each</p>
+                          <p className="text-xs text-muted">₹{item.price} × {item.quantity}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              // Remove one — remove the last id in the group
-                              const lastId = item.ids[item.ids.length - 1]
-                              removeItemMut.mutate({ orderId: o.id, itemId: lastId })
-                            }}
-                            className="w-6 h-6 rounded-full bg-surface2 hover:bg-red-dim text-text hover:text-red flex items-center justify-center font-bold transition-colors text-sm">
-                            −
-                          </button>
-                          <span className="font-bold text-sm text-text w-4 text-center">{item.quantity}</span>
-                          <button
-                            onClick={() => {
-                              addItemsToOrder(o.id, {
-                                order_type: 'dine_in',
-                                table_number: tableModal,
-                                discount_percent: 0,
-                                items: [{ menu_item_id: item.menu_item_id, name: item.name, price: item.price, quantity: 1 }]
-                              }).then(() => {
-                                qc.fetchQuery({ queryKey: ['activeTables'], queryFn: getActiveTables }).then(result => {
-                                  const updated = (result || []).find(t => String(t.table_number) === String(tableModal))
-                                  if (updated) setTableOrder(updated)
-                                })
-                              })
-                            }}
-                            className="w-6 h-6 rounded-full bg-surface2 hover:bg-green-dim text-text hover:text-green2 flex items-center justify-center font-bold transition-colors text-sm">
-                            +
-                          </button>
-                        </div>
-                        <p className="font-bold text-sm text-green2 w-14 text-right">{formatINR(item.total)}</p>
+                        <p className="font-bold text-sm text-green2">{formatINR(item.total)}</p>
                       </div>
                     ))
                   })()}
@@ -402,39 +346,11 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {/* Grand total — calculated from actual items */}
-            <div className="bg-green-dim border border-green/20 rounded-xl p-3">
-              <div className="flex justify-between font-display font-black text-base text-green2">
-                <span>Grand Total ({tableOrder.orders?.length} KOT{tableOrder.orders?.length > 1 ? 's' : ''})</span>
-                <span>{formatINR(
-                  tableOrder.orders?.reduce((total, o) => {
-                    const subtotal = o.items.reduce((s, i) => s + i.total, 0)
-                    return total + subtotal + Math.round(subtotal * 0.05)
-                  }, 0) || 0
-                )}</span>
-              </div>
-            </div>
-
             {/* Actions */}
-            <div className="flex gap-2">
-              <Button variant="primary" className="flex-1 justify-center" icon={<Plus size={13}/>}
-                onClick={() => {
-                  // Pre-select table in cart before navigating
-                  import('../store/cart').then(({ useCartStore }) => {
-                    const cart = useCartStore.getState()
-                    cart.setOrderType('dine_in')
-                    cart.setTableNumber(String(tableModal))
-                  })
-                  setTableModal(null); setTableOrder(null)
-                  navigate('/billing')
-                }}>
-                + Add Items
-              </Button>
-              <Button variant="secondary" className="flex-1 justify-center"
-                onClick={() => { setTableModal(null); setTableOrder(null); navigate('/orders') }}>
-                View in Orders →
-              </Button>
-            </div>
+            <Button variant="primary" className="w-full justify-center"
+              onClick={() => { setTableModal(null); setTableOrder(null); navigate('/orders') }}>
+              View in Orders →
+            </Button>
           </div>
         ) : (
           <p className="text-center text-muted py-8">No active order found</p>

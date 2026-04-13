@@ -89,14 +89,22 @@ function Receipt({ order, profile }) {
           </tr>
         </thead>
         <tbody>
-          {(order.items || []).map(item => (
-            <tr key={item.id}>
-              <td style={{ paddingBottom: 3, color: '#1c1917' }}>{item.name}</td>
-              <td style={{ textAlign: 'center', color: '#78716c' }}>×{item.quantity}</td>
-              <td style={{ textAlign: 'right', color: '#78716c' }}>₹{item.price}</td>
-              <td style={{ textAlign: 'right', fontWeight: 600, color: '#1c1917' }}>₹{item.total}</td>
-            </tr>
-          ))}
+          {(() => {
+            const grouped = []
+            ;(order.items || []).forEach(item => {
+              const ex = grouped.find(g => g.name === item.name && g.price === item.price)
+              if (ex) { ex.quantity += item.quantity; ex.total += item.total }
+              else grouped.push({ ...item })
+            })
+            return grouped.map((item, i) => (
+              <tr key={i}>
+                <td style={{ paddingBottom: 3, color: '#1c1917' }}>{item.name}</td>
+                <td style={{ textAlign: 'center', color: '#78716c' }}>×{item.quantity}</td>
+                <td style={{ textAlign: 'right', color: '#78716c' }}>₹{item.price}</td>
+                <td style={{ textAlign: 'right', fontWeight: 600, color: '#1c1917' }}>₹{item.total}</td>
+              </tr>
+            ))
+          })()}
         </tbody>
       </table>
 
