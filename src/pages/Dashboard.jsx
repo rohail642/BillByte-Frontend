@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getDashboardSummary, getOrders, updateStatus, collectPayment } from '../api/orders'
+import { getDashboardSummary, getOrders, updateStatus, collectPayment, getActiveTables, removeOrderItem, collectAllForTable, addItemsToOrder } from '../api/orders'
 import { getRevenueTrend, getTopDishes } from '../api/reports'
 import { getInventory } from '../api/inventory'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { TrendingUp, ShoppingBag, Receipt, LayoutGrid, CreditCard } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Receipt, LayoutGrid, CreditCard, X, Plus } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -44,6 +44,9 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Dashboard() {
   const [trendRange, setTrendRange] = useState('7D')
   const [payModal,   setPayModal]   = useState(null)
+  const [tableModal,  setTableModal]  = useState(null) // table number string
+  const [tableOrder,  setTableOrder]  = useState(null) // loaded order for that table
+  const [tableLoading, setTableLoading] = useState(false)
   const qc = useQueryClient()
   const navigate = useNavigate()
 
@@ -70,6 +73,56 @@ export default function Dashboard() {
       toast.success('Order updated!')
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['summary'] })
+    },
+    onError: e => toast.error(String(e)),
+  })
+
+  const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 5000 })
+
+  const loadTableOrder = (tableNum) => {
+    const tableData = (activeTables || []).find(t => String(t.table_number) === String(tableNum))
+    if (!tableData) { toast.error(`No active order for Table ${tableNum}`); return }
+    setTableModal(tableNum)
+    setTableOrder(tableData)
+  }
+
+  const removeItemMut = useMutation({
+    mutationFn: ({ orderId, itemId }) => removeOrderItem(orderId, itemId),
+    onMutate: ({ orderId, itemId }) => {
+      setTableOrder(prev => {
+        if (!prev) return prev
+        const updatedOrders = prev.orders.map(o => {
+          if (o.id !== orderId) return o
+          const updatedItems = o.items.filter(i => i.id !== itemId)
+          return { ...o, items: updatedItems }
+        }).filter(o => o.items.length > 0)
+        if (!updatedOrders.length) return null
+        return { ...prev, orders: updatedOrders }
+      })
+    },
+    onSuccess: () => {
+      toast.success('Item removed!')
+      qc.invalidateQueries({ queryKey: ['activeTables'] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['summary'] })
+      // Close if no items left
+      setTableOrder(prev => { if (!prev) { setTableModal(null) } return prev })
+    },
+    onError: (e) => {
+      toast.error(e?.response?.data?.detail || e?.message || 'Failed to remove item')
+      // Revert by refreshing from server
+      qc.invalidateQueries({ queryKey: ['activeTables'] })
+    },
+  })
+
+  const collectAllMut = useMutation({
+    mutationFn: ({ table, method }) => collectAllForTable(table, { payment_method: method, discount_percent: 0 }),
+    onSuccess: (data) => {
+      toast.success(`✅ ${data.message}`)
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['activeTables'] })
+      qc.invalidateQueries({ queryKey: ['summary'] })
+      setTableModal(null); setTableOrder(null)
     },
     onError: e => toast.error(String(e)),
   })
@@ -158,7 +211,7 @@ export default function Dashboard() {
           </div>
           <div className="space-y-2 overflow-y-auto flex-1">
             {!liveOrders && <div className="flex justify-center py-4"><Spinner /></div>}
-            {(liveOrders || []).slice(0, 8).map(o => (
+            {(liveOrders || []).filter(o => o.status !== 'cancelled').slice(0, 8).map(o => (
               <div key={o.id} className="p-2.5 bg-surface2 rounded-lg hover:bg-surface3 transition-colors">
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
@@ -258,7 +311,8 @@ export default function Dashboard() {
               return (
                 <div key={i}
                   title={order ? `${order.order_number} · ₹${order.total_amount}` : `Table ${tNum} — Free`}
-                  className={`aspect-square rounded-lg flex flex-col items-center justify-center text-[10px] font-bold cursor-pointer transition-all hover:scale-105 ${
+                  onClick={() => order && loadTableOrder(tNum)}
+                  className={`aspect-square rounded-lg flex flex-col items-center justify-center text-[10px] font-bold transition-all hover:scale-105 ${order ? 'cursor-pointer' : 'cursor-default'} ${
                     s==='occ'     ? 'bg-red-dim text-red border border-red/20' :
                     s==='bill'    ? 'bg-orange-dim text-orange border border-orange/20' :
                     s==='pending' ? 'bg-red-dim text-red border border-red/20' :
@@ -282,6 +336,110 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
+
+      {/* Table modal */}
+      <Modal open={!!tableModal} onClose={() => { setTableModal(null); setTableOrder(null) }}
+        title={`🪑 Table ${tableModal}`} size="lg">
+        {tableOrder ? (
+          <div className="space-y-4">
+            {tableOrder.customer_name && (
+              <p className="text-xs text-muted">👤 {tableOrder.customer_name}</p>
+            )}
+
+            {/* All items across all orders for this table */}
+            <div className="space-y-1">
+              {tableOrder.orders?.map(o => (
+                <div key={o.id}>
+                  <p className="text-[10px] text-muted uppercase font-bold tracking-wide py-1">{o.order_number} · {o.status.replace('_',' ')}</p>
+                  {(() => {
+                    // Group same items together
+                    const grouped = []
+                    o.items.forEach(item => {
+                      const ex = grouped.find(g => g.name === item.name && g.price === item.price)
+                      if (ex) { ex.quantity += item.quantity; ex.total += item.total; ex.ids.push(item.id) }
+                      else grouped.push({ ...item, ids: [item.id] })
+                    })
+                    return grouped.map((item, i) => (
+                      <div key={i} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-text">{item.name}</p>
+                          <p className="text-xs text-muted">₹{item.price} each</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              // Remove one — remove the last id in the group
+                              const lastId = item.ids[item.ids.length - 1]
+                              removeItemMut.mutate({ orderId: o.id, itemId: lastId })
+                            }}
+                            className="w-6 h-6 rounded-full bg-surface2 hover:bg-red-dim text-text hover:text-red flex items-center justify-center font-bold transition-colors text-sm">
+                            −
+                          </button>
+                          <span className="font-bold text-sm text-text w-4 text-center">{item.quantity}</span>
+                          <button
+                            onClick={() => {
+                              addItemsToOrder(o.id, {
+                                order_type: 'dine_in',
+                                table_number: tableModal,
+                                discount_percent: 0,
+                                items: [{ menu_item_id: item.menu_item_id, name: item.name, price: item.price, quantity: 1 }]
+                              }).then(() => {
+                                qc.fetchQuery({ queryKey: ['activeTables'], queryFn: getActiveTables }).then(result => {
+                                  const updated = (result || []).find(t => String(t.table_number) === String(tableModal))
+                                  if (updated) setTableOrder(updated)
+                                })
+                              })
+                            }}
+                            className="w-6 h-6 rounded-full bg-surface2 hover:bg-green-dim text-text hover:text-green2 flex items-center justify-center font-bold transition-colors text-sm">
+                            +
+                          </button>
+                        </div>
+                        <p className="font-bold text-sm text-green2 w-14 text-right">{formatINR(item.total)}</p>
+                      </div>
+                    ))
+                  })()}
+                </div>
+              ))}
+            </div>
+
+            {/* Grand total — calculated from actual items */}
+            <div className="bg-green-dim border border-green/20 rounded-xl p-3">
+              <div className="flex justify-between font-display font-black text-base text-green2">
+                <span>Grand Total ({tableOrder.orders?.length} KOT{tableOrder.orders?.length > 1 ? 's' : ''})</span>
+                <span>{formatINR(
+                  tableOrder.orders?.reduce((total, o) => {
+                    const subtotal = o.items.reduce((s, i) => s + i.total, 0)
+                    return total + subtotal + Math.round(subtotal * 0.05)
+                  }, 0) || 0
+                )}</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button variant="primary" className="flex-1 justify-center" icon={<Plus size={13}/>}
+                onClick={() => {
+                  // Pre-select table in cart before navigating
+                  import('../store/cart').then(({ useCartStore }) => {
+                    const cart = useCartStore.getState()
+                    cart.setOrderType('dine_in')
+                    cart.setTableNumber(String(tableModal))
+                  })
+                  setTableModal(null); setTableOrder(null)
+                  navigate('/billing')
+                }}>
+                + Add Items
+              </Button>
+              <Button variant="secondary" className="flex-1 justify-center"
+                onClick={() => { setTableModal(null); setTableOrder(null); navigate('/orders') }}>
+                View in Orders →
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-center text-muted py-8">No active order found</p>
+        )}
+      </Modal>
 
       {/* Pay modal */}
       <Modal open={!!payModal} onClose={() => setPayModal(null)} title="💳 Collect Payment">

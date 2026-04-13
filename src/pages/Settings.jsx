@@ -48,7 +48,16 @@ export default function Settings() {
         city:            profile.city            || '',
         gstin:           profile.gstin           || '',
         fssai:           profile.fssai           || '',
-        gst_rate:        profile.gst_rate        ?? 5,
+        gst_rate:             profile.gst_rate             ?? 5,
+        zomato_enabled:       profile.zomato_enabled       || false,
+        zomato_restaurant_id: profile.zomato_restaurant_id || '',
+        zomato_secret:        '',
+        swiggy_enabled:       profile.swiggy_enabled       || false,
+        swiggy_restaurant_id: profile.swiggy_restaurant_id || '',
+        swiggy_secret:        '',
+        razorpay_enabled:     profile.razorpay_enabled     || false,
+        razorpay_key_id:      profile.razorpay_key_id      || '',
+        razorpay_key_secret:  '',
       })
     }
   }, [profile])
@@ -110,12 +119,86 @@ export default function Settings() {
     integrations: (
       <div className="space-y-4">
         <h3 className="font-display font-bold text-sm text-text">Integrations</h3>
-        <Card className="space-y-2.5">
-          <Toggle checked={toggles.zomato}   onChange={() => toggle('zomato')}   label="🍕 Zomato"    description="Restaurant ID: ZOM-884921" />
-          <Toggle checked={toggles.swiggy}   onChange={() => toggle('swiggy')}   label="🛵 Swiggy"    description="Restaurant ID: SWG-334401" />
-          <Toggle checked={toggles.razorpay} onChange={() => toggle('razorpay')} label="💳 Razorpay"  description="UPI & Card payments" />
-          <Toggle checked={toggles.tally}    onChange={() => toggle('tally')}    label="📒 Tally ERP" description="Sync transactions daily" />
+        <p className="text-xs text-muted">Configure your delivery platform integrations. Each restaurant gets a unique webhook URL.</p>
+
+        {/* Zomato */}
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔴</span>
+              <div>
+                <p className="text-sm font-bold text-text">Zomato</p>
+                <p className="text-xs text-muted">Receive orders automatically from Zomato</p>
+              </div>
+            </div>
+            <Toggle checked={form.zomato_enabled || false} onChange={() => set('zomato_enabled', !form.zomato_enabled)} label="" />
+          </div>
+          {form.zomato_enabled && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Input label="Zomato Restaurant ID" placeholder="ZOM-884921"
+                value={form.zomato_restaurant_id || ''} onChange={e => set('zomato_restaurant_id', e.target.value)} />
+              <Input label="Webhook Secret (from Zomato dashboard)" placeholder="zom_secret_xxxxx"
+                value={form.zomato_secret || ''} onChange={e => set('zomato_secret', e.target.value)} />
+              {profile?.restaurant_id && (
+                <div className="bg-surface2 rounded-lg p-2.5">
+                  <p className="text-[10px] text-muted mb-1 font-bold uppercase tracking-wide">Your Webhook URL — give this to Zomato:</p>
+                  <code className="text-xs text-green2 break-all">https://yourdomain.com/api/webhooks/zomato/{profile.restaurant_id}</code>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
+
+        {/* Swiggy */}
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🟠</span>
+              <div>
+                <p className="text-sm font-bold text-text">Swiggy</p>
+                <p className="text-xs text-muted">Receive orders automatically from Swiggy</p>
+              </div>
+            </div>
+            <Toggle checked={form.swiggy_enabled || false} onChange={() => set('swiggy_enabled', !form.swiggy_enabled)} label="" />
+          </div>
+          {form.swiggy_enabled && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Input label="Swiggy Restaurant ID" placeholder="SWG-334401"
+                value={form.swiggy_restaurant_id || ''} onChange={e => set('swiggy_restaurant_id', e.target.value)} />
+              <Input label="Webhook Secret (from Swiggy dashboard)" placeholder="swg_secret_xxxxx"
+                value={form.swiggy_secret || ''} onChange={e => set('swiggy_secret', e.target.value)} />
+              {profile?.restaurant_id && (
+                <div className="bg-surface2 rounded-lg p-2.5">
+                  <p className="text-[10px] text-muted mb-1 font-bold uppercase tracking-wide">Your Webhook URL — give this to Swiggy:</p>
+                  <code className="text-xs text-green2 break-all">https://yourdomain.com/api/webhooks/swiggy/{profile.restaurant_id}</code>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* WhatsApp note */}
+        <Card className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">💬</span>
+            <div>
+              <p className="text-sm font-bold text-text">WhatsApp Orders</p>
+              <p className="text-xs text-muted">No setup needed — staff manually enters WhatsApp orders using the New Order button on the Online Orders page.</p>
+            </div>
+          </div>
+        </Card>
+
+        <Button variant="primary" size="sm" loading={saveMut.isPending}
+          onClick={() => saveMut.mutate({
+            zomato_enabled: form.zomato_enabled,
+            zomato_secret: form.zomato_secret,
+            zomato_restaurant_id: form.zomato_restaurant_id,
+            swiggy_enabled: form.swiggy_enabled,
+            swiggy_secret: form.swiggy_secret,
+            swiggy_restaurant_id: form.swiggy_restaurant_id,
+          })}>
+          Save Integrations
+        </Button>
       </div>
     ),
     notifications: (

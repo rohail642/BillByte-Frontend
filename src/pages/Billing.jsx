@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMenuItems, getCategories } from '../api/menu'
-import { createOrder, collectPayment, updateStatus } from '../api/orders'
+import { createOrder, addItemsToOrder, collectPayment, updateStatus, getActiveTables } from '../api/orders'
 import { getProfile } from '../api/auth'
-import { lookupCustomer, createCustomer } from '../api/customers'
+import { lookupCustomer, createCustomer, redeemPoints } from '../api/customers'
 import { useCartStore } from '../store/cart'
 import toast from 'react-hot-toast'
 import Card from '../components/ui/Card'
@@ -150,18 +150,45 @@ export default function Billing() {
   const [addCustModal, setAddCustModal] = useState(false)
   const [custName, setCustName] = useState('')
   const [addingCust, setAddingCust] = useState(false)
+  const [pointsApplied, setPointsApplied] = useState(false)
+  const [activeOrderId, setActiveOrderId] = useState(null)
 
   const cart     = useCartStore()
   const qc       = useQueryClient()
   const navigate = useNavigate()
   const subtotal = cart.getSubtotal()
   const gst      = cart.getGst()
+
+  // Clear discount when points are removed
+  useEffect(() => {
+    if (!pointsApplied) cart.setDiscount(0)
+  }, [pointsApplied])
+
+  // Clear points when cart items change
+  useEffect(() => {
+    if (pointsApplied) { cart.setDiscount(0); setPointsApplied(false) }
+  }, [cart.items.length])
   const discount = cart.getDiscount()
   const total    = cart.getTotal()
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: getCategories })
   const { data: menuItems }  = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ active_only: true }) })
   const { data: profile }    = useQuery({ queryKey: ['profile'],   queryFn: getProfile })
+  const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 10000 })
+
+  // Check if selected table already has an active order
+  const activeTableData = cart.orderType === 'dine_in' && cart.tableNumber
+    ? (activeTables || []).find(t => String(t.table_number) === String(cart.tableNumber))
+    : null
+
+  // Auto-link to existing order silently when table is occupied
+  useEffect(() => {
+    if (activeTableData && !activeOrderId) {
+      const latestOrder = activeTableData.orders?.[0]
+      if (latestOrder) setActiveOrderId(latestOrder.id)
+    }
+    if (!activeTableData) setActiveOrderId(null)
+  }, [activeTableData?.orders?.[0]?.id])
 
   const filtered = (menuItems || []).filter(m =>
     (!catFilter || m.category_id === catFilter) &&
@@ -187,24 +214,36 @@ export default function Billing() {
 
   const submitOrder = useMutation({
     mutationFn: async ({ payMethod, showReceipt }) => {
-      // Step 1 — Create the order
-      const order = await createOrder({
-        order_type:       cart.orderType,
-        table_number:     cart.tableNumber || null,
-        customer_name:    cart.customerName || null,
-        discount_percent: cart.discountPercent,
-        items: cart.items.map(i => ({ menu_item_id: i.id, name: i.name, price: i.price, quantity: i.qty })),
-        customer_id: foundCustomer?.id || null,
-      })
+      const itemsPayload = cart.items.map(i => ({ menu_item_id: i.id, name: i.name, price: i.price, quantity: i.qty }))
 
-      if (payMethod === 'kot') {
-        // KOT only — notify kitchen, deduct inventory, stay as kot_sent
+      let order
+      if (activeOrderId && payMethod === 'kot') {
+        // Adding to existing table order — just append items and send KOT
+        order = await addItemsToOrder(activeOrderId, {
+          order_type: cart.orderType,
+          table_number: cart.tableNumber || null,
+          discount_percent: 0,
+          items: itemsPayload,
+        })
         await updateStatus(order.id, 'kot_sent')
       } else {
-        // Pay — always KOT first (notifies kitchen + deducts inventory), then mark paid
-        await updateStatus(order.id, 'kot_sent')
-        await collectPayment(order.id, { payment_method: payMethod, discount_percent: cart.discountPercent })
-        order.payment_method = payMethod
+        // New order
+        order = await createOrder({
+          order_type:       cart.orderType,
+          table_number:     cart.tableNumber || null,
+          customer_name:    cart.customerName || null,
+          discount_percent: cart.discountPercent,
+          items:            itemsPayload,
+          customer_id:      foundCustomer?.id || null,
+        })
+
+        if (payMethod === 'kot') {
+          await updateStatus(order.id, 'kot_sent')
+        } else {
+          await updateStatus(order.id, 'kot_sent')
+          await collectPayment(order.id, { payment_method: payMethod, discount_percent: cart.discountPercent })
+          order.payment_method = payMethod
+        }
       }
 
       return { order, showReceipt }
@@ -215,9 +254,18 @@ export default function Billing() {
           ? `✅ Payment done — #${order.order_number}`
           : `📋 KOT sent — #${order.order_number}`
       )
+      // Deduct points from DB only after successful payment
+      if (pointsApplied && foundCustomer?.id) {
+        const ptsToDeduct = Math.min(foundCustomer.loyalty_points, Math.floor(order.subtotal || 0))
+        if (ptsToDeduct >= 100) {
+          redeemPoints(foundCustomer.id, ptsToDeduct).catch(() => {})
+        }
+      }
       cart.clearCart()
       setFoundCustomer(null)
       setNotFound(false)
+      setPointsApplied(false)
+      setActiveOrderId(null)
       setPayModal(false)
       // Sync everything instantly
       qc.invalidateQueries({ queryKey: ['orders'] })
@@ -283,21 +331,42 @@ export default function Billing() {
         <Card className="flex-shrink-0 space-y-2.5">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold text-sm text-text flex items-center gap-1.5">
-              <UtensilsCrossed size={14} />Current Bill
+              <UtensilsCrossed size={14} />
+              {activeOrderId ? `Adding to Table ${cart.tableNumber}` : 'Current Bill'}
             </h3>
+
+
             <button onClick={() => cart.clearCart()} className="text-xs text-muted hover:text-red transition-colors">Clear</button>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Select value={cart.orderType} onChange={e => cart.setOrderType(e.target.value)}>
+            <Select value={cart.orderType} onChange={e => { cart.setOrderType(e.target.value); cart.setTableNumber('') }}>
               <option value="dine_in">Dine-in</option>
               <option value="takeaway">Takeaway</option>
               <option value="delivery">Delivery</option>
             </Select>
-            <Select value={cart.tableNumber} onChange={e => cart.setTableNumber(e.target.value)}
-              className={cart.orderType === 'dine_in' && !cart.tableNumber ? 'border-orange focus:border-orange' : ''}>
-              <option value="">{cart.orderType === 'dine_in' ? 'Table *' : 'Table'}</option>
-              {Array.from({length:16},(_,i) => <option key={i} value={String(i+1)}>Table {i+1}</option>)}
-            </Select>
+            {cart.orderType === 'dine_in' && (
+              <Select value={cart.tableNumber} onChange={e => {
+                const tNum = e.target.value
+                const occupied = (activeTables || []).find(t => String(t.table_number) === tNum)
+                if (occupied && !activeOrderId) {
+                  // Auto-link to existing order
+                  const latestOrder = occupied.orders?.[0]
+                  if (latestOrder) setActiveOrderId(latestOrder.id)
+                }
+                cart.setTableNumber(tNum)
+              }}>
+                <option value="">Table *</option>
+                {Array.from({length:16},(_,i) => {
+                  const tNum = String(i+1)
+                  const occupied = (activeTables || []).find(t => String(t.table_number) === tNum)
+                  return (
+                    <option key={i} value={tNum}>
+                      {occupied ? `🔴 Table ${tNum} (Active)` : `Table ${tNum}`}
+                    </option>
+                  )
+                })}
+              </Select>
+            )}
           </div>
           <div className="relative">
             <input
@@ -326,11 +395,31 @@ export default function Billing() {
                   <p className="text-[10px] text-green2">{foundCustomer.loyalty_points} pts available (= ₹{foundCustomer.loyalty_points} off)</p>
                 </div>
                 {foundCustomer.loyalty_points >= 100 && (
-                  <button
-                    className="text-[10px] bg-green text-white rounded-lg px-2 py-1 font-semibold hover:bg-green2 transition-colors"
-                    onClick={() => cart.setDiscount(Math.min(100, Math.round(foundCustomer.loyalty_points / cart.getSubtotal() * 100)))}>
-                    Apply Points
-                  </button>
+                  pointsApplied ? (
+                    <button
+                      className="text-[10px] bg-red text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90 transition-colors"
+                      onClick={() => {
+                        cart.setDiscount(0)
+                        setPointsApplied(false)
+                      }}>
+                      Remove Points
+                    </button>
+                  ) : (
+                    <button
+                      className="text-[10px] bg-green text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90 transition-colors"
+                      onClick={() => {
+                        const subtotal = cart.getSubtotal()
+                        if (subtotal === 0) { toast.error('Add items first'); return }
+                        if (foundCustomer.loyalty_points < 100) { toast.error('Minimum 100 points needed'); return }
+                        const ptsToUse = Math.min(foundCustomer.loyalty_points, Math.floor(subtotal))
+                        const discPct = Math.floor((ptsToUse / subtotal) * 100)
+                        cart.setDiscount(discPct)
+                        setPointsApplied(true)
+                        toast.success(`🎁 ${ptsToUse} points applied = ₹${ptsToUse} off!`)
+                      }}>
+                      Apply Points
+                    </button>
+                  )
                 )}
               </div>
             )}
@@ -385,9 +474,18 @@ export default function Billing() {
               </div>
             </div>
             <div className="flex gap-1.5">
-              <input type="number" min="0" max="100" placeholder="Disc %"
-                className="w-20 bg-bg border border-border2 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-green"
-                value={cart.discountPercent || ''} onChange={e => cart.setDiscount(Number(e.target.value))} />
+              <div className="relative">
+                <input type="number" min="0" max="100" placeholder="Disc %"
+                  className={`w-20 bg-bg border rounded-lg px-2 py-1.5 text-xs outline-none transition-all ${
+                    pointsApplied ? 'border-green bg-green-dim text-green2 cursor-not-allowed' : 'border-border2 focus:border-green'
+                  }`}
+                  value={cart.discountPercent || ''}
+                  readOnly={pointsApplied}
+                  onChange={e => !pointsApplied && cart.setDiscount(Number(e.target.value))} />
+                {pointsApplied && (
+                  <span className="absolute -top-4 left-0 text-[9px] text-green2 font-bold whitespace-nowrap">🎁 Points applied</span>
+                )}
+              </div>
               <input placeholder="Coupon"
                 className="flex-1 bg-bg border border-border2 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-green" />
             </div>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSalesReport, getTopDishes, getRevenueTrend } from '../api/reports'
 import { getOrders } from '../api/orders'
+import client from '../api/client'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -85,6 +86,66 @@ export default function Reports() {
     }
   }
 
+  const exportGST = async () => {
+    try {
+      toast.loading('Preparing GST report...', { id: 'gst' })
+      const today = new Date()
+      const res = await client.get('/reports/gst-summary', {
+        params: { month: today.getMonth() + 1, year: today.getFullYear() }
+      })
+      const data = res
+
+      const rows = [
+        [`GST Summary — ${data.month}/${data.year}`],
+        [`Total Orders: ${data.total_orders}`, `Total Taxable Value: ${data.total_taxable_value}`, `Total GST: ${data.total_gst}`, `CGST: ${data.cgst}`, `SGST: ${data.sgst}`],
+        [],
+        ['Order Number', 'Date', 'Time', 'Type', 'Taxable Value', 'GST (5%)', 'CGST (2.5%)', 'SGST (2.5%)', 'Total', 'Payment'],
+        ...data.orders.map(o => [
+          o.order_number, o.date, o.time, o.order_type,
+          o.taxable_value, o.gst, o.cgst, o.sgst, o.total, o.payment
+        ])
+      ]
+
+      const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\n')
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = `billbyte-gst-${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`✅ GST report exported — ${data.total_orders} orders`, { id: 'gst' })
+    } catch(e) { toast.error('GST export failed', { id: 'gst' }) }
+  }
+
+  const exportInventory = async () => {
+    try {
+      toast.loading('Preparing inventory report...', { id: 'inv' })
+      const data = await client.get('/reports/inventory-report')
+
+      const rows = [
+        [`Inventory Report — ${new Date().toLocaleDateString('en-IN')}`],
+        [`Total Items: ${data.total_items}`, `Total Stock Value: ₹${data.total_value}`, `Low Stock Items: ${data.low_stock_count}`],
+        [],
+        ['Item Name', 'Category', 'Quantity', 'Unit', 'Min Qty', 'Cost/Unit (₹)', 'Stock Value (₹)', 'Status', 'Expiry Date'],
+        ...data.items.map(i => [
+          i.name, i.category, i.quantity, i.unit,
+          i.min_quantity, i.cost_per_unit, i.stock_value, i.status, i.expiry_date
+        ])
+      ]
+
+      const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\n')
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = `billbyte-inventory-${new Date().toISOString().slice(0,10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`✅ Inventory exported — ${data.total_items} items`, { id: 'inv' })
+    } catch(e) { toast.error('Inventory export failed', { id: 'inv' }) }
+  }
+
   const { data: sales, isLoading: salesLoading } = useQuery({
     queryKey: ['sales', period],
     queryFn: () => getSalesReport(period),
@@ -107,18 +168,6 @@ export default function Reports() {
   const pieData = sales?.by_order_type
     ? Object.entries(sales.by_order_type).map(([name, value]) => ({ name: name.replace('_', '-'), value }))
     : []
-
-  const REPORT_CARDS = [
-    { icon: '📊', name: 'Daily Sales Report',  desc: 'Revenue, orders, avg bill' },
-    { icon: '📦', name: 'Inventory Usage',     desc: 'Stock consumed & remaining' },
-    { icon: '🧾', name: 'GST Summary',         desc: 'CGST, SGST breakup for filing' },
-    { icon: '👥', name: 'Customer Analytics',  desc: 'Retention, frequency, LTV' },
-    { icon: '🍽️', name: 'Item-wise Sales',    desc: 'Best sellers & slow movers' },
-    { icon: '🛵', name: 'Delivery Report',     desc: 'Platform-wise orders & revenue' },
-    { icon: '🧑‍🍳', name: 'Staff Performance', desc: 'Attendance & productivity' },
-    { icon: '💳', name: 'Payment Methods',     desc: 'Cash vs UPI vs Card split' },
-    { icon: '🏪', name: 'Table Turnover',      desc: 'Occupancy & turnaround time' },
-  ]
 
   return (
     <div className="space-y-5">
@@ -221,16 +270,47 @@ export default function Reports() {
 
         {/* Report cards */}
         <Card>
-          <h3 className="font-display font-bold text-sm text-text mb-4">Download Reports</h3>
-          <div className="grid grid-cols-3 gap-2">
-            {REPORT_CARDS.map(r => (
-              <button key={r.name} onClick={() => toast.success(`📥 Generating ${r.name}…`)}
-                className="p-2.5 rounded-xl bg-surface2 border border-border hover:border-green/30 hover:bg-green-dim transition-all text-left group">
-                <div className="text-xl mb-1.5">{r.icon}</div>
-                <p className="text-[11px] font-semibold text-text leading-tight mb-0.5">{r.name}</p>
-                <p className="text-[10px] text-muted">{r.desc}</p>
-              </button>
-            ))}
+          <h3 className="font-display font-bold text-sm text-text mb-1">Download Reports</h3>
+          <p className="text-xs text-muted mb-4">All reports export as CSV — open directly in Excel or Google Sheets</p>
+          <div className="space-y-2">
+            {/* Orders CSV */}
+            <button onClick={exportCSV} disabled={exporting}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface2 border border-border hover:border-green/30 hover:bg-green-dim transition-all text-left group">
+              <div className="text-2xl">📊</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text">All Orders Report</p>
+                <p className="text-xs text-muted">Every order with items, totals, payment method, customer</p>
+              </div>
+              <div className="flex-shrink-0">
+                <Badge color="green">CSV</Badge>
+              </div>
+            </button>
+
+            {/* GST Summary */}
+            <button onClick={exportGST}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface2 border border-border hover:border-green/30 hover:bg-green-dim transition-all text-left group">
+              <div className="text-2xl">🧾</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text">GST Summary — This Month</p>
+                <p className="text-xs text-muted">CGST + SGST breakup per order, ready for filing</p>
+              </div>
+              <div className="flex-shrink-0">
+                <Badge color="blue">CSV</Badge>
+              </div>
+            </button>
+
+            {/* Inventory */}
+            <button onClick={exportInventory}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface2 border border-border hover:border-green/30 hover:bg-green-dim transition-all text-left group">
+              <div className="text-2xl">📦</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text">Inventory Snapshot</p>
+                <p className="text-xs text-muted">Current stock levels, values, low stock & expiry status</p>
+              </div>
+              <div className="flex-shrink-0">
+                <Badge color="orange">CSV</Badge>
+              </div>
+            </button>
           </div>
         </Card>
       </div>
