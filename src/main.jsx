@@ -1,0 +1,39 @@
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Toaster } from 'react-hot-toast'
+import App from './App'
+import './index.css'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+    },
+  },
+})
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <QueryClientProvider client={queryClient}>
+    <App />
+    <Toaster
+      position="bottom-center"
+      toastOptions={{
+        style: {
+          background: '#1c1917',
+          color: '#fff',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontSize: '13px',
+          fontWeight: '600',
+          borderRadius: '100px',
+          padding: '10px 18px',
+        },
+        success: { iconTheme: { primary: '#16a34a', secondary: '#fff' } },
+        error:   { iconTheme: { primary: '#dc2626', secondary: '#fff' } },
+      }}
+    />
+  </QueryClientProvider>
+)
