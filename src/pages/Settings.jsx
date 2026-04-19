@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProfile, updateProfile } from '../api/auth'
+import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
 import { useAuthStore } from '../store/auth'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
 import Toggle from '../components/ui/Toggle'
+import Modal from '../components/ui/Modal'
+import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
-import { Store, Receipt, Link2, Bell, FileText } from 'lucide-react'
+import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const SECTIONS = [
@@ -17,6 +21,7 @@ const SECTIONS = [
   { id: 'integrations',  label: 'Integrations',  icon: Link2    },
   { id: 'notifications', label: 'Notifications', icon: Bell     },
   { id: 'gst',           label: 'GST / Tax',     icon: FileText },
+  { id: 'team',          label: 'Team Access',   icon: Users    },
 ]
 
 export default function Settings() {
@@ -80,6 +85,44 @@ export default function Settings() {
     onSuccess: () => toast.success('GST settings saved!'),
     onError: (e) => toast.error(String(e)),
   })
+
+  const { user } = useAuthStore()
+  const isOwner = user?.role === 'owner'
+  const [teamModal, setTeamModal] = useState(false)
+  const [editMember, setEditMember] = useState(null)
+  const [teamForm, setTeamForm] = useState({})
+  const setTF = (k, v) => setTeamForm(f => ({ ...f, [k]: v }))
+
+  const { data: team, refetch: refetchTeam } = useQuery({
+    queryKey: ['team'],
+    queryFn: getTeam,
+    enabled: isOwner,
+  })
+
+  const addMut = useMutation({
+    mutationFn: addTeamMember,
+    onSuccess: () => { toast.success('Team member added!'); refetchTeam(); setTeamModal(false); setTeamForm({}) },
+    onError: e => toast.error(e?.response?.data?.detail || String(e)),
+  })
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, ...body }) => updateTeamMember(id, body),
+    onSuccess: () => { toast.success('Updated!'); refetchTeam(); setEditMember(null) },
+    onError: e => toast.error(String(e)),
+  })
+
+  const removeMut = useMutation({
+    mutationFn: removeTeamMember,
+    onSuccess: () => { toast.success('Removed!'); refetchTeam() },
+    onError: e => toast.error(String(e)),
+  })
+
+  const ROLE_COLORS = { owner: 'purple', manager: 'blue', cashier: 'green', waiter: 'gray' }
+  const ROLE_ACCESS_LABELS = {
+    manager: 'Dashboard, Billing, Orders, Menu, Inventory, CRM, Staff, Reports',
+    cashier:  'Billing, Orders, CRM only',
+    waiter:   'Billing and Orders only',
+  }
 
   const content = {
     restaurant: (
@@ -228,6 +271,114 @@ export default function Settings() {
             </Button>
           </Card>
         )}
+      </div>
+    ),
+    team: (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-display font-bold text-sm text-text">Team Access</h3>
+            <p className="text-xs text-muted mt-0.5">Manage who can log in and what they can see</p>
+          </div>
+          {isOwner && (
+            <Button variant="primary" size="sm" icon={<Plus size={13}/>}
+              onClick={() => { setTeamForm({}); setTeamModal(true) }}>
+              Add Member
+            </Button>
+          )}
+        </div>
+
+        {!isOwner ? (
+          <Card><p className="text-sm text-muted text-center py-4">Only the owner can manage team access.</p></Card>
+        ) : (
+          <div className="space-y-2">
+            {/* Current user */}
+            <Card className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-green text-white flex items-center justify-center text-xs font-bold">
+                {user?.name?.slice(0,1)}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-text">{user?.name} <span className="text-muted font-normal">(you)</span></p>
+                <p className="text-xs text-muted">Full access — Owner</p>
+              </div>
+              <Badge color="purple">Owner</Badge>
+            </Card>
+
+            {(team || []).map(member => (
+              <Card key={member.id} className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-surface3 text-text flex items-center justify-center text-xs font-bold">
+                  {member.name.slice(0,1)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-text">{member.name}</p>
+                  <p className="text-xs text-muted truncate">{member.email}</p>
+                  <p className="text-[10px] text-muted">{ROLE_ACCESS_LABELS[member.role]}</p>
+                </div>
+                <Badge color={ROLE_COLORS[member.role] || 'gray'}>{member.role}</Badge>
+                {!member.is_active && <Badge color="red">Inactive</Badge>}
+                <div className="flex gap-1">
+                  <button onClick={() => { setEditMember(member); setTeamForm({ name: member.name, role: member.role }) }}
+                    className="p-1.5 rounded-lg hover:bg-surface2 text-muted hover:text-text transition-colors">
+                    <Pencil size={13}/>
+                  </button>
+                  <button onClick={() => { if(confirm('Remove this member?')) removeMut.mutate(member.id) }}
+                    className="p-1.5 rounded-lg hover:bg-red-dim text-muted hover:text-red transition-colors">
+                    <Trash2 size={13}/>
+                  </button>
+                </div>
+              </Card>
+            ))}
+
+            {(team || []).length === 0 && (
+              <Card className="text-center py-6">
+                <p className="text-sm text-muted">No team members yet. Add waiters, cashiers or managers.</p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Add member modal */}
+        <Modal open={teamModal} onClose={() => setTeamModal(false)} title="➕ Add Team Member"
+          footer={<>
+            <Button variant="secondary" onClick={() => setTeamModal(false)}>Cancel</Button>
+            <Button variant="primary" loading={addMut.isPending}
+              onClick={() => {
+                if (!teamForm.name || !teamForm.email || !teamForm.password) { toast.error('All fields required'); return }
+                addMut.mutate({ name: teamForm.name, email: teamForm.email, password: teamForm.password, role: teamForm.role || 'waiter' })
+              }}>Add</Button>
+          </>}>
+          <div className="space-y-3">
+            <Input label="Full Name" placeholder="e.g. Ramesh Kumar" value={teamForm.name||''} onChange={e=>setTF('name',e.target.value)} />
+            <Input label="Email" type="email" placeholder="ramesh@restaurant.com" value={teamForm.email||''} onChange={e=>setTF('email',e.target.value)} />
+            <Input label="Password" type="password" placeholder="Set a login password" value={teamForm.password||''} onChange={e=>setTF('password',e.target.value)} />
+            <Select label="Role" value={teamForm.role||'waiter'} onChange={e=>setTF('role',e.target.value)}>
+              <option value="waiter">Waiter — Billing & Orders only</option>
+              <option value="cashier">Cashier — Billing, Orders & CRM</option>
+              <option value="manager">Manager — Everything except Settings & Salaries</option>
+            </Select>
+          </div>
+        </Modal>
+
+        {/* Edit member modal */}
+        <Modal open={!!editMember} onClose={() => setEditMember(null)} title="✏️ Edit Team Member"
+          footer={<>
+            <Button variant="secondary" onClick={() => setEditMember(null)}>Cancel</Button>
+            <Button variant="primary" loading={updateMut.isPending}
+              onClick={() => updateMut.mutate({ id: editMember.id, name: teamForm.name, role: teamForm.role })}>
+              Save
+            </Button>
+          </>}>
+          <div className="space-y-3">
+            <Input label="Full Name" value={teamForm.name||''} onChange={e=>setTF('name',e.target.value)} />
+            <Select label="Role" value={teamForm.role||'waiter'} onChange={e=>setTF('role',e.target.value)}>
+              <option value="waiter">Waiter</option>
+              <option value="cashier">Cashier</option>
+              <option value="manager">Manager</option>
+            </Select>
+            <Input label="New Password (leave blank to keep)" type="password" placeholder="Optional"
+              value={teamForm.password||''} onChange={e=>setTF('password',e.target.value)} />
+          </div>
+        </Modal>
       </div>
     ),
   }

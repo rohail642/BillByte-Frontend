@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/auth'
 import { useQuery } from '@tanstack/react-query'
 import { getAlerts } from '../../api/inventory'
 import {
-  LayoutDashboard, Receipt, ShoppingBag, UtensilsCrossed, Package,
+  LayoutGrid, LayoutDashboard, Receipt, ShoppingBag, UtensilsCrossed, Package,
   Users, ChefHat, BarChart2, Settings, LogOut, ClipboardList, Bike
 } from 'lucide-react'
 import { clsx } from 'clsx'

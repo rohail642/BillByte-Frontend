@@ -1,8 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
-import { useEffect, useState } from 'react'
 import AppLayout from './components/layout/AppLayout'
-import AIAssistant from './components/layout/AIAssistant'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Billing from './pages/Billing'
@@ -17,20 +15,6 @@ import Settings from './pages/Settings'
 
 function ProtectedRoute({ children }) {
   const token = useAuthStore(s => s.token)
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => { setReady(true) }, [])
-
-  if (!ready) return (
-    <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ fontFamily:'Outfit', fontWeight:900, fontSize:'2rem', color:'#16a34a' }}>
-          Bill<span style={{ color:'#ea580c' }}>Byte</span>
-        </div>
-      </div>
-    </div>
-  )
-
   if (!token) return <Navigate to="/login" replace />
   return children
 }
@@ -41,8 +25,6 @@ function PublicRoute({ children }) {
 }
 
 export default function App() {
-  const token = useAuthStore(s => s.token)
-
   return (
     <BrowserRouter>
       <Routes>
@@ -58,10 +40,9 @@ export default function App() {
           <Route path="staff"         element={<Staff />} />
           <Route path="reports"       element={<Reports />} />
           <Route path="settings"      element={<Settings />} />
-          <Route path="*"             element={<Navigate to="/" replace />} />
         </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      {token && <AIAssistant />}
     </BrowserRouter>
   )
 }
