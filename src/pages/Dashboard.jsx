@@ -1,9 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getDashboardSummary, getOrders, updateStatus, collectPayment, getActiveTables, collectAllForTable } from '../api/orders'
+import { useQuery } from '@tanstack/react-query'
+import { getDashboardSummary, getOrders, getActiveTables } from '../api/orders'
 import { getRevenueTrend, getTopDishes } from '../api/reports'
 import { getInventory } from '../api/inventory'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { TrendingUp, ShoppingBag, Receipt, LayoutGrid, CreditCard } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Receipt, LayoutGrid } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -43,11 +43,8 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function Dashboard() {
   const [trendRange, setTrendRange] = useState('7D')
-  const [payModal,   setPayModal]   = useState(null)
   const [tableModal,  setTableModal]  = useState(null) // table number string
   const [tableOrder,  setTableOrder]  = useState(null) // loaded order for that table
-  const [tableLoading, setTableLoading] = useState(false)
-  const qc = useQueryClient()
   const navigate = useNavigate()
 
   const { data: summary }   = useQuery({ queryKey: ['summary'],   queryFn: getDashboardSummary, refetchInterval: 5000 })
@@ -55,27 +52,6 @@ export default function Dashboard() {
   const { data: topDishes } = useQuery({ queryKey: ['topDishes'], queryFn: () => getTopDishes('today') })
   const { data: liveOrders } = useQuery({ queryKey: ['orders', 'live'], queryFn: () => getOrders({ limit: 50 }), refetchInterval: 5000 })
   const { data: inventory } = useQuery({ queryKey: ['inventory'], queryFn: () => getInventory({}) })
-
-  const payMut = useMutation({
-    mutationFn: ({ id, method }) => collectPayment(id, { payment_method: method, discount_percent: 0 }),
-    onSuccess: () => {
-      toast.success('✅ Payment collected!')
-      qc.invalidateQueries({ queryKey: ['orders'] })
-      qc.invalidateQueries({ queryKey: ['summary'] })
-      setPayModal(null)
-    },
-    onError: e => toast.error(String(e)),
-  })
-
-  const statusMut = useMutation({
-    mutationFn: ({ id, status }) => updateStatus(id, status),
-    onSuccess: () => {
-      toast.success('Order updated!')
-      qc.invalidateQueries({ queryKey: ['orders'] })
-      qc.invalidateQueries({ queryKey: ['summary'] })
-    },
-    onError: e => toast.error(String(e)),
-  })
 
   const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 5000 })
 
@@ -87,18 +63,6 @@ export default function Dashboard() {
   }
 
 
-
-  const collectAllMut = useMutation({
-    mutationFn: ({ table, method }) => collectAllForTable(table, { payment_method: method, discount_percent: 0 }),
-    onSuccess: (data) => {
-      toast.success(`✅ ${data.message}`)
-      qc.invalidateQueries({ queryKey: ['orders'] })
-      qc.invalidateQueries({ queryKey: ['activeTables'] })
-      qc.invalidateQueries({ queryKey: ['summary'] })
-      setTableModal(null); setTableOrder(null)
-    },
-    onError: e => toast.error(String(e)),
-  })
 
   const lowStock  = (inventory || []).filter(i => i.is_low_stock)
   const chartData = (trend || []).map(d => ({
@@ -197,16 +161,6 @@ export default function Dashboard() {
                   <Badge color={statusColor(o.status)}>{o.status.replace('_',' ')}</Badge>
                 </div>
 
-                {/* Collect payment for unpaid orders */}
-                {o.payment_status !== 'paid' && o.status !== 'cancelled' && (
-                  <div className="mt-2 pt-2 border-t border-border">
-                    <Button variant="primary" size="xs" icon={<CreditCard size={11}/>}
-                      className="w-full justify-center"
-                      onClick={() => setPayModal(o)}>
-                      Collect Payment
-                    </Button>
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -357,24 +311,6 @@ export default function Dashboard() {
         )}
       </Modal>
 
-      {/* Pay modal */}
-      <Modal open={!!payModal} onClose={() => setPayModal(null)} title="💳 Collect Payment">
-        {payModal && (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted mb-1">{payModal.order_number}</p>
-            <p className="font-display font-black text-4xl text-green2">{formatINR(payModal.total_amount)}</p>
-            <p className="text-sm text-muted mt-1">Including GST</p>
-            <div className="flex gap-2 justify-center mt-6">
-              {[['cash','💵 Cash'],['upi','📱 UPI'],['card','💳 Card']].map(([m, l]) => (
-                <Button key={m} variant="secondary" loading={payMut.isPending}
-                  onClick={() => payMut.mutate({ id: payModal.id, method: m })}>
-                  {l}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }

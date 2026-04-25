@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProfile, updateProfile } from '../api/auth'
 import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
@@ -12,16 +12,27 @@ import Modal from '../components/ui/Modal'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
-import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil } from 'lucide-react'
+import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed } from 'lucide-react'
 import { clsx } from 'clsx'
 
+const SECTION_COLORS = [
+  { id: 'blue',   hex: '#3b82f6' },
+  { id: 'orange', hex: '#ea580c' },
+  { id: 'green',  hex: '#16a34a' },
+  { id: 'purple', hex: '#9333ea' },
+  { id: 'teal',   hex: '#0d9488' },
+  { id: 'red',    hex: '#dc2626' },
+  { id: 'gray',   hex: '#78716c' },
+]
+
 const SECTIONS = [
-  { id: 'restaurant',    label: 'Restaurant',    icon: Store    },
-  { id: 'billing',       label: 'Billing',       icon: Receipt  },
-  { id: 'integrations',  label: 'Integrations',  icon: Link2    },
-  { id: 'notifications', label: 'Notifications', icon: Bell     },
-  { id: 'gst',           label: 'GST / Tax',     icon: FileText },
-  { id: 'team',          label: 'Team Access',   icon: Users    },
+  { id: 'restaurant',    label: 'Restaurant',    icon: Store           },
+  { id: 'billing',       label: 'Billing',       icon: Receipt         },
+  { id: 'tables',        label: 'Tables',        icon: UtensilsCrossed },
+  { id: 'integrations',  label: 'Integrations',  icon: Link2           },
+  { id: 'notifications', label: 'Notifications', icon: Bell            },
+  { id: 'gst',           label: 'GST / Tax',     icon: FileText        },
+  { id: 'team',          label: 'Team Access',   icon: Users           },
 ]
 
 export default function Settings() {
@@ -40,37 +51,76 @@ export default function Settings() {
     queryFn: getProfile,
   })
 
-  const [form, setForm] = useState({})
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const baseForm = useMemo(() => profile ? {
+    name:                profile.name                || '',
+    phone:               profile.phone               || '',
+    restaurant_name:     profile.restaurant_name     || '',
+    address:             profile.address             || '',
+    city:                profile.city                || '',
+    gstin:               profile.gstin               || '',
+    fssai:               profile.fssai               || '',
+    gst_rate:            profile.gst_rate            ?? 5,
+    table_count:         profile.table_count         ?? 10,
+    zomato_enabled:      profile.zomato_enabled      || false,
+    zomato_restaurant_id:profile.zomato_restaurant_id|| '',
+    zomato_secret:       '',
+    swiggy_enabled:      profile.swiggy_enabled      || false,
+    swiggy_restaurant_id:profile.swiggy_restaurant_id|| '',
+    swiggy_secret:       '',
+    razorpay_enabled:    profile.razorpay_enabled    || false,
+    razorpay_key_id:     profile.razorpay_key_id     || '',
+    razorpay_key_secret: '',
+  } : {}, [profile])
 
+  const [overrides, setOverrides] = useState({})
+  const form = { ...baseForm, ...overrides }
+  const set = (k, v) => setOverrides(f => ({ ...f, [k]: v }))
+
+  // Table sections state
+  const [tableCount, setTableCount] = useState(10)
+  const [tableSections, setTableSections] = useState([])
   useEffect(() => {
     if (profile) {
-      setForm({
-        name:            profile.name            || '',
-        phone:           profile.phone           || '',
-        restaurant_name: profile.restaurant_name || '',
-        address:         profile.address         || '',
-        city:            profile.city            || '',
-        gstin:           profile.gstin           || '',
-        fssai:           profile.fssai           || '',
-        gst_rate:             profile.gst_rate             ?? 5,
-        zomato_enabled:       profile.zomato_enabled       || false,
-        zomato_restaurant_id: profile.zomato_restaurant_id || '',
-        zomato_secret:        '',
-        swiggy_enabled:       profile.swiggy_enabled       || false,
-        swiggy_restaurant_id: profile.swiggy_restaurant_id || '',
-        swiggy_secret:        '',
-        razorpay_enabled:     profile.razorpay_enabled     || false,
-        razorpay_key_id:      profile.razorpay_key_id      || '',
-        razorpay_key_secret:  '',
-      })
+      setTableCount(profile.table_count ?? 10)
+      setTableSections(profile.table_sections || [])
     }
   }, [profile])
+
+  function addSection() {
+    setTableSections(prev => [...prev, {
+      id: Date.now().toString(),
+      name: '',
+      color: SECTION_COLORS[prev.length % SECTION_COLORS.length].id,
+      tables: [],
+    }])
+  }
+  function removeSection(id) {
+    setTableSections(prev => prev.filter(s => s.id !== id))
+  }
+  function updateSection(id, key, val) {
+    setTableSections(prev => prev.map(s => s.id === id ? { ...s, [key]: val } : s))
+  }
+  function toggleTableInSection(sectionId, tableNum) {
+    setTableSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s
+      const has = s.tables.includes(tableNum)
+      // Remove from any other section first, then add/remove here
+      return { ...s, tables: has ? s.tables.filter(t => t !== tableNum) : [...s.tables, tableNum].sort((a,b)=>a-b) }
+    }))
+  }
+  const [colorPickerOpen, setColorPickerOpen] = useState(null)
+
+  const saveTablesMut = useMutation({
+    mutationFn: () => updateProfile({ table_count: tableCount, table_sections: tableSections }),
+    onSuccess: () => { toast.success('Table settings saved!'); qc.invalidateQueries({ queryKey: ['profile'] }) },
+    onError: e => toast.error(String(e)),
+  })
 
   const saveMut = useMutation({
     mutationFn: updateProfile,
     onSuccess: (data) => {
       toast.success('Settings saved!')
+      setOverrides({})
       qc.invalidateQueries({ queryKey: ['profile'] })
       useAuthStore.setState(s => ({
         user: { ...s.user, name: data.name },
@@ -82,7 +132,7 @@ export default function Settings() {
 
   const saveGst = useMutation({
     mutationFn: updateProfile,
-    onSuccess: () => toast.success('GST settings saved!'),
+    onSuccess: () => { toast.success('GST settings saved!'); setOverrides({}) },
     onError: (e) => toast.error(String(e)),
   })
 
@@ -271,6 +321,127 @@ export default function Settings() {
             </Button>
           </Card>
         )}
+      </div>
+    ),
+    tables: (
+      <div className="space-y-4">
+        <h3 className="font-display font-bold text-sm text-text">Table Management</h3>
+
+        {/* Total count */}
+        <Card className="space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-text mb-0.5">Total Tables</p>
+            <p className="text-[10px] text-muted mb-2">How many physical tables does your restaurant have?</p>
+            <div className="flex items-center gap-3">
+              <input
+                type="number" min="1" max="100"
+                value={tableCount}
+                onChange={e => setTableCount(Number(e.target.value))}
+                className="w-24 bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-green transition-colors"
+              />
+              <span className="text-xs text-muted">tables</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Sections */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-text">Table Sections</p>
+            <p className="text-[10px] text-muted mt-0.5">Group tables by zone — AC, Non-AC, Outdoor, Rooftop, etc.</p>
+          </div>
+          <Button variant="secondary" size="sm" icon={<Plus size={13}/>} onClick={addSection}>
+            Add Section
+          </Button>
+        </div>
+
+        {tableSections.length === 0 && (
+          <Card className="text-center py-6">
+            <UtensilsCrossed size={24} className="text-muted mx-auto mb-2" />
+            <p className="text-sm text-muted">No sections yet.</p>
+            <p className="text-xs text-muted mt-0.5">Add sections to organize tables by zone (AC, Non-AC, etc.)</p>
+          </Card>
+        )}
+
+        {tableSections.map((section, idx) => {
+          const colorHex = SECTION_COLORS.find(c => c.id === section.color)?.hex || '#78716c'
+          const assignedInOthers = new Set(
+            tableSections.filter(s => s.id !== section.id).flatMap(s => s.tables)
+          )
+          return (
+            <Card key={section.id} className="space-y-3">
+              <div className="flex items-center gap-2">
+                {/* Color picker */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => setColorPickerOpen(colorPickerOpen === section.id ? null : section.id)}
+                    className="w-6 h-6 rounded-full border-2 border-white shadow"
+                    style={{ background: colorHex }}
+                  />
+                  {colorPickerOpen === section.id && (
+                    <div className="absolute top-8 left-0 z-20 bg-bg2 border border-border rounded-xl p-2 shadow-lg flex flex-wrap gap-1.5 w-36">
+                      {SECTION_COLORS.map(c => (
+                        <button key={c.id}
+                          onClick={() => { updateSection(section.id, 'color', c.id); setColorPickerOpen(null) }}
+                          className={clsx('w-6 h-6 rounded-full border-2 transition-all',
+                            section.color === c.id ? 'border-text scale-110' : 'border-transparent hover:scale-110')}
+                          style={{ background: c.hex }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input
+                  className="flex-1 bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-green transition-colors font-semibold"
+                  placeholder="Section name (e.g. AC, Non-AC, Outdoor…)"
+                  value={section.name}
+                  onChange={e => updateSection(section.id, 'name', e.target.value)}
+                />
+                <span className="text-[10px] text-muted flex-shrink-0">{section.tables.length} tables</span>
+                <button onClick={() => removeSection(section.id)}
+                  className="text-muted hover:text-red transition-colors p-1 rounded flex-shrink-0">
+                  <Trash2 size={14}/>
+                </button>
+              </div>
+
+              {/* Table number picker */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">
+                  Select tables for this section
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.from({ length: tableCount }, (_, i) => i + 1).map(n => {
+                    const selected = section.tables.includes(n)
+                    const locked   = !selected && assignedInOthers.has(n)
+                    return (
+                      <button
+                        key={n}
+                        disabled={locked}
+                        onClick={() => toggleTableInSection(section.id, n)}
+                        title={locked ? 'Already in another section' : `Table ${n}`}
+                        className={clsx(
+                          'w-9 h-9 rounded-lg text-xs font-bold border transition-all',
+                          selected
+                            ? 'text-white border-transparent'
+                            : locked
+                              ? 'bg-surface2 border-border text-muted opacity-40 cursor-not-allowed'
+                              : 'bg-surface2 border-border text-text2 hover:border-green/50 hover:text-green'
+                        )}
+                        style={selected ? { background: colorHex, borderColor: colorHex } : {}}
+                      >
+                        {n}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </Card>
+          )
+        })}
+
+        <Button variant="primary" size="sm" loading={saveTablesMut.isPending}
+          onClick={() => saveTablesMut.mutate()}>
+          Save Table Settings
+        </Button>
       </div>
     ),
     team: (

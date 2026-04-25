@@ -79,7 +79,7 @@ export default function Reports() {
       URL.revokeObjectURL(url)
 
       toast.success(`✅ Exported ${orders.length} orders!`, { id: 'export' })
-    } catch (e) {
+    } catch {
       toast.error('Export failed', { id: 'export' })
     } finally {
       setExporting(false)
@@ -115,7 +115,7 @@ export default function Reports() {
       a.click()
       URL.revokeObjectURL(url)
       toast.success(`✅ GST report exported — ${data.total_orders} orders`, { id: 'gst' })
-    } catch(e) { toast.error('GST export failed', { id: 'gst' }) }
+    } catch { toast.error('GST export failed', { id: 'gst' }) }
   }
 
   const exportInventory = async () => {
@@ -143,7 +143,7 @@ export default function Reports() {
       a.click()
       URL.revokeObjectURL(url)
       toast.success(`✅ Inventory exported — ${data.total_items} items`, { id: 'inv' })
-    } catch(e) { toast.error('Inventory export failed', { id: 'inv' }) }
+    } catch { toast.error('Inventory export failed', { id: 'inv' }) }
   }
 
   const { data: sales, isLoading: salesLoading } = useQuery({

@@ -23,12 +23,12 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const ROLES = ['Head Chef','Sous Chef','Waiter','Cashier','Delivery','Cleaner','Manager','Barista']
 
 // ── Attendance Calendar ────────────────────────────────────────────────────
-function AttendanceCalendar({ staffId, staffName }) {
+function AttendanceCalendar({ staffId }) {
   const today = new Date()
   const [month, setMonth] = useState(today.getMonth() + 1)
   const [year,  setYear]  = useState(today.getFullYear())
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['attendance', staffId, month, year],
     queryFn: () => getAttendance(staffId, month, year),
   })

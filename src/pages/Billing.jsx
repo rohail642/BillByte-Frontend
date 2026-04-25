@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMenuItems, getCategories } from '../api/menu'
 import { createOrder, addItemsToOrder, collectPayment, updateStatus, getActiveTables } from '../api/orders'
 import { getProfile } from '../api/auth'
-import { lookupCustomer, createCustomer, redeemPoints } from '../api/customers'
+import { lookupCustomer, createCustomer } from '../api/customers'
 import { useCartStore } from '../store/cart'
 import toast from 'react-hot-toast'
 import Card from '../components/ui/Card'
@@ -109,7 +109,7 @@ function ReceiptView({ order, profile }) {
           <span>Subtotal</span><span>₹{order.subtotal}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#78716c', marginBottom: 2 }}>
-          <span>GST (5%)</span><span>₹{order.gst_amount}</span>
+          <span>GST ({r.gst_rate || 5}%)</span><span>₹{order.gst_amount}</span>
         </div>
         {order.discount_amount > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ea580c', marginBottom: 2 }}>
@@ -151,7 +151,6 @@ export default function Billing() {
   const [catFilter, setCatFilter]   = useState('')
   const [payModal, setPayModal]     = useState(false)
   const [receiptModal, setReceiptModal] = useState(null)
-  const [pendingPayMethod, setPendingPayMethod] = useState(null)
   const [foundCustomer, setFoundCustomer] = useState(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [notFound, setNotFound] = useState(false)
@@ -159,7 +158,6 @@ export default function Billing() {
   const [custName, setCustName] = useState('')
   const [addingCust, setAddingCust] = useState(false)
   const [pointsApplied, setPointsApplied] = useState(false)
-  const [activeOrderId, setActiveOrderId] = useState(null)
   const [activeTableView, setActiveTableView] = useState(false)
   const [selectedTable, setSelectedTable] = useState(null)
 
@@ -186,6 +184,11 @@ export default function Billing() {
   const { data: profile }    = useQuery({ queryKey: ['profile'],   queryFn: getProfile })
   const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 10000 })
 
+  // Sync restaurant GST rate into cart store when profile loads
+  useEffect(() => {
+    if (profile?.gst_rate) cart.setGstRate(profile.gst_rate)
+  }, [profile?.gst_rate])
+
 
 
 
@@ -198,7 +201,7 @@ export default function Billing() {
   // Auto-lookup customer by phone as cashier types
   useEffect(() => {
     const phone = cart.customerName
-    if (!phone || phone.length < 6) { setFoundCustomer(null); return }
+    if (!phone || phone.length < 10) { setFoundCustomer(null); setNotFound(false); return }
     const timer = setTimeout(async () => {
       try {
         setLookingUp(true)
@@ -217,9 +220,9 @@ export default function Billing() {
       const itemsPayload = cart.items.map(i => ({ menu_item_id: i.id, name: i.name, price: i.price, quantity: i.qty }))
 
       let order
-      if (activeOrderId && payMethod === 'kot') {
+      if (cart.activeOrderId && payMethod === 'kot') {
         // Adding to existing table order — just append items and send KOT
-        order = await addItemsToOrder(activeOrderId, {
+        order = await addItemsToOrder(cart.activeOrderId, {
           order_type: cart.orderType,
           table_number: cart.tableNumber || null,
           discount_percent: 0,
@@ -241,7 +244,14 @@ export default function Billing() {
           await updateStatus(order.id, 'kot_sent')
         } else {
           await updateStatus(order.id, 'kot_sent')
-          await collectPayment(order.id, { payment_method: payMethod, discount_percent: cart.discountPercent })
+          const ptsToRedeem = (pointsApplied && foundCustomer?.id)
+            ? Math.min(foundCustomer.loyalty_points, Math.floor((order.subtotal || 0) * 10))
+            : 0
+          await collectPayment(order.id, {
+            payment_method: payMethod,
+            discount_percent: cart.discountPercent,
+            points_to_redeem: ptsToRedeem,
+          })
           order.payment_method = payMethod
         }
       }
@@ -254,18 +264,10 @@ export default function Billing() {
           ? `✅ Payment done — #${order.order_number}`
           : `📋 KOT sent — #${order.order_number}`
       )
-      // Deduct points from DB only after successful payment
-      if (pointsApplied && foundCustomer?.id) {
-        const ptsToDeduct = Math.min(foundCustomer.loyalty_points, Math.floor(order.subtotal || 0))
-        if (ptsToDeduct >= 100) {
-          redeemPoints(foundCustomer.id, ptsToDeduct).catch(() => {})
-        }
-      }
       cart.clearCart()
       setFoundCustomer(null)
       setNotFound(false)
       setPointsApplied(false)
-      setActiveOrderId(null)
       setPayModal(false)
       // Sync everything instantly
       qc.invalidateQueries({ queryKey: ['orders'] })
@@ -326,7 +328,7 @@ export default function Billing() {
                         cart.setOrderType('dine_in')
                         cart.setTableNumber(String(table.table_number))
                         const latestOrder = table.orders[0]
-                        setActiveOrderId(latestOrder?.id || null)
+                        cart.setActiveOrderId(latestOrder?.id || null)
                         setActiveTableView(false)
                         setSelectedTable(null)
                         toast.success(`Table ${table.table_number} selected — add items and Send KOT`)
@@ -404,7 +406,7 @@ export default function Billing() {
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold text-sm text-text flex items-center gap-1.5">
               <UtensilsCrossed size={14} />
-              {activeOrderId ? `Adding to Table ${cart.tableNumber}` : 'Current Bill'}
+              {cart.activeOrderId ? `Adding to Table ${cart.tableNumber}` : 'Current Bill'}
             </h3>
 
 
@@ -430,10 +432,16 @@ export default function Billing() {
               }`}
               placeholder="Phone number to link customer"
               value={cart.customerName}
-              onChange={e => { cart.setCustomerName(e.target.value); setFoundCustomer(null); setNotFound(false) }}
+              onChange={e => {
+                cart.setCustomerName(e.target.value)
+                setFoundCustomer(null)
+                setNotFound(false)
+                // If points were applied, revoke the discount when customer is removed
+                if (pointsApplied) { cart.setDiscount(0); setPointsApplied(false) }
+              }}
             />
             {lookingUp && <p className="text-[10px] text-muted mt-1 animate-pulse">🔍 Looking up customer...</p>}
-            {notFound && !lookingUp && cart.customerName.length >= 6 && (
+            {notFound && !lookingUp && cart.customerName.length >= 10 && (
               <div className="mt-1.5 bg-orange-dim border border-orange/20 rounded-lg px-3 py-2 flex items-center justify-between">
                 <p className="text-xs text-orange font-semibold">No customer found</p>
                 <button
@@ -447,7 +455,7 @@ export default function Billing() {
               <div className="mt-1.5 bg-green-dim border border-green/20 rounded-lg px-3 py-2 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-green2">✅ {foundCustomer.name}</p>
-                  <p className="text-[10px] text-green2">{foundCustomer.loyalty_points} pts available (= ₹{foundCustomer.loyalty_points} off)</p>
+                  <p className="text-[10px] text-green2">{foundCustomer.loyalty_points} pts available (= ₹{Math.floor(foundCustomer.loyalty_points / 10)} off)</p>
                 </div>
                 {foundCustomer.loyalty_points >= 100 && (
                   pointsApplied ? (
@@ -466,11 +474,13 @@ export default function Billing() {
                         const subtotal = cart.getSubtotal()
                         if (subtotal === 0) { toast.error('Add items first'); return }
                         if (foundCustomer.loyalty_points < 100) { toast.error('Minimum 100 points needed'); return }
-                        const ptsToUse = Math.min(foundCustomer.loyalty_points, Math.floor(subtotal))
-                        const discPct = Math.floor((ptsToUse / subtotal) * 100)
+                        // 10 pts = ₹1, so cap pts at subtotal*10 (max discount = full bill)
+                        const ptsToUse = Math.min(foundCustomer.loyalty_points, Math.floor(subtotal * 10))
+                        const discountRupees = Math.floor(ptsToUse / 10)
+                        const discPct = Math.floor((discountRupees / subtotal) * 100)
                         cart.setDiscount(discPct)
                         setPointsApplied(true)
-                        toast.success(`🎁 ${ptsToUse} points applied = ₹${ptsToUse} off!`)
+                        toast.success(`🎁 ${ptsToUse} points applied = ₹${discountRupees} off!`)
                       }}>
                       Apply Points
                     </button>
@@ -516,7 +526,7 @@ export default function Billing() {
             <div className="space-y-1.5">
               {[
                 ['Subtotal', formatINR(subtotal)],
-                ['GST (5%)', formatINR(gst)],
+                [`GST (${cart.gstRate}%)`, formatINR(gst)],
                 ['Discount', `-${formatINR(discount)}`],
               ].map(([l, v]) => (
                 <div key={l} className="flex justify-between text-xs text-text3">
@@ -602,7 +612,7 @@ export default function Billing() {
         title={payModal === 'receipt' ? '🧾 Pay & Get Receipt' : '💳 Collect Payment'}>
         <div className="text-center py-4">
           <p className="font-display font-black text-4xl text-green2">{formatINR(total)}</p>
-          <p className="text-sm text-muted mt-1">Including 5% GST</p>
+          <p className="text-sm text-muted mt-1">Including {cart.gstRate}% GST</p>
           {discount > 0 && <p className="text-xs text-orange mt-0.5">Discount: -{formatINR(discount)}</p>}
           <p className="text-xs text-muted mt-3 mb-1">Select payment method</p>
           <div className="flex gap-2 justify-center mt-2">

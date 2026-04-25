@@ -6,6 +6,8 @@ export const useCartStore = create((set, get) => ({
   tableNumber: '',
   customerName: '',
   discountPercent: 0,
+  activeOrderId: null,
+  gstRate: 5,
 
   addItem: (item) => set(s => {
     const ex = s.items.find(i => i.id === item.id)
@@ -19,18 +21,20 @@ export const useCartStore = create((set, get) => ({
     ).filter(Boolean)
   })),
   deleteItem:     (id) => set(s => ({ items: s.items.filter(i => i.id !== id) })),
-  clearCart:      ()   => set({ items: [], discountPercent: 0, customerName: '', tableNumber: '' }),
-  setOrderType:   (v)  => set({ orderType: v }),
-  setTableNumber: (v)  => set({ tableNumber: v }),
-  setCustomerName:(v)  => set({ customerName: v }),
-  setDiscount:    (v)  => set({ discountPercent: v }),
+  clearCart:       ()  => set({ items: [], discountPercent: 0, customerName: '', tableNumber: '', activeOrderId: null }),
+  setOrderType:    (v) => set({ orderType: v }),
+  setTableNumber:  (v) => set({ tableNumber: v }),
+  setCustomerName: (v) => set({ customerName: v }),
+  setDiscount:     (v) => set({ discountPercent: v }),
+  setActiveOrderId:(v) => set({ activeOrderId: v }),
+  setGstRate:      (v) => set({ gstRate: v }),
 
   getSubtotal: () => get().items.reduce((s, i) => s + i.price * i.qty, 0),
-  getGst:      () => Math.round(get().items.reduce((s, i) => s + i.price * i.qty, 0) * 0.05),
+  getGst:      () => Math.round(get().items.reduce((s, i) => s + i.price * i.qty, 0) * get().gstRate / 100),
   getDiscount: () => Math.round(get().items.reduce((s, i) => s + i.price * i.qty, 0) * get().discountPercent / 100),
   getTotal:    () => {
     const sub = get().items.reduce((s, i) => s + i.price * i.qty, 0)
-    const gst = Math.round(sub * 0.05)
+    const gst = Math.round(sub * get().gstRate / 100)
     const disc = Math.round(sub * get().discountPercent / 100)
     return sub + gst - disc
   },

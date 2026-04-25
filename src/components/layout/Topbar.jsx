@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Menu, Bell, Plus } from 'lucide-react'
+import { Menu, Bell, TrendingUp, Plus } from 'lucide-react'
 import { useUIStore } from '../../store/ui'
 import { useAuthStore } from '../../store/auth'
 import { getAlerts } from '../../api/inventory'
-import { getOrders } from '../../api/orders'
-import Button from '../ui/Button'
+import { getOrders, getDashboardSummary } from '../../api/orders'
+import { formatINR } from '../../utils'
 
 const titles = {
   '/':              'Dashboard',
@@ -23,7 +23,8 @@ const titles = {
 
 export default function Topbar() {
   const { toggleSidebar } = useUIStore()
-  const { restaurantName } = useAuthStore()
+  const { restaurantName, user } = useAuthStore()
+  const isCashier = user?.role === 'cashier' || user?.role === 'waiter'
   const location  = useLocation()
   const navigate  = useNavigate()
   const title     = titles[location.pathname] || 'BillByte'
@@ -47,6 +48,12 @@ export default function Topbar() {
     queryKey: ['orders', 'live'],
     queryFn: () => getOrders({ limit: 50 }),
     refetchInterval: 10000,
+  })
+
+  const { data: summary } = useQuery({
+    queryKey: ['summary'],
+    queryFn: getDashboardSummary,
+    refetchInterval: 30000,
   })
 
   // Build notifications
@@ -171,10 +178,22 @@ export default function Topbar() {
           )}
         </div>
 
-        <Button variant="primary" size="sm" icon={<Plus size={14} />}
-          onClick={() => navigate('/billing')}>
-          New Bill
-        </Button>
+        {isCashier ? (
+          <button
+            onClick={() => navigate('/billing')}
+            className="hidden sm:flex items-center gap-1.5 bg-green text-white rounded-full px-3 py-1.5 text-[11px] font-bold hover:opacity-90 transition-opacity">
+            <Plus size={12} />
+            New Bill
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/reports')}
+            className="hidden sm:flex items-center gap-1.5 bg-surface2 border border-border hover:border-green/40 hover:bg-green-dim text-text2 hover:text-green2 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all">
+            <TrendingUp size={12} />
+            {summary?.today_revenue != null ? formatINR(summary.today_revenue) : '—'}
+            <span className="text-muted font-normal">today</span>
+          </button>
+        )}
       </div>
     </header>
   )

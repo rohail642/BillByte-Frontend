@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getOrders, updateStatus, collectPayment } from '../api/orders'
 import { getProfile } from '../api/auth'
-import { useAuthStore } from '../store/auth'
 import toast from 'react-hot-toast'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -158,7 +157,6 @@ function printReceipt() {
 
 export default function Orders() {
   const qc = useQueryClient()
-  const { restaurantName } = useAuthStore()
   const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter,   setTypeFilter]   = useState('')
   const [payModal,     setPayModal]     = useState(null)
@@ -168,9 +166,6 @@ export default function Orders() {
   const { data: orders, isLoading, refetch } = useQuery({
     queryKey: ['orders', statusFilter, typeFilter],
     queryFn: () => {
-      const filter = FILTERS.find(f => f.key === statusFilter)
-      // For 'active' and 'ready' we fetch all and filter client-side
-      // since API only supports single status filter
       return getOrders({
         limit: 200,
         ...(typeFilter ? { order_type: typeFilter } : {}),
@@ -189,7 +184,7 @@ export default function Orders() {
 
   const payMut = useMutation({
     mutationFn: ({ id, method }) => collectPayment(id, { payment_method: method, discount_percent: 0 }),
-    onSuccess: (_, vars) => {
+    onSuccess: () => {
       toast.success('✅ Payment collected!')
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['orders', 'live'] })
