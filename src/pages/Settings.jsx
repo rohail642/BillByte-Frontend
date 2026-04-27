@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProfile, updateProfile } from '../api/auth'
 import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
@@ -61,6 +61,7 @@ export default function Settings() {
     fssai:               profile.fssai               || '',
     gst_rate:            profile.gst_rate            ?? 5,
     table_count:         profile.table_count         ?? 10,
+    table_sections:      profile.table_sections      || [],
     zomato_enabled:      profile.zomato_enabled      || false,
     zomato_restaurant_id:profile.zomato_restaurant_id|| '',
     zomato_secret:       '',
@@ -76,43 +77,52 @@ export default function Settings() {
   const form = { ...baseForm, ...overrides }
   const set = (k, v) => setOverrides(f => ({ ...f, [k]: v }))
 
-  // Table sections state
-  const [tableCount, setTableCount] = useState(10)
-  const [tableSections, setTableSections] = useState([])
-  useEffect(() => {
-    if (profile) {
-      setTableCount(profile.table_count ?? 10)
-      setTableSections(profile.table_sections || [])
-    }
-  }, [profile])
-
-  function addSection() {
-    setTableSections(prev => [...prev, {
-      id: Date.now().toString(),
-      name: '',
-      color: SECTION_COLORS[prev.length % SECTION_COLORS.length].id,
-      tables: [],
-    }])
-  }
-  function removeSection(id) {
-    setTableSections(prev => prev.filter(s => s.id !== id))
-  }
-  function updateSection(id, key, val) {
-    setTableSections(prev => prev.map(s => s.id === id ? { ...s, [key]: val } : s))
-  }
-  function toggleTableInSection(sectionId, tableNum) {
-    setTableSections(prev => prev.map(s => {
-      if (s.id !== sectionId) return s
-      const has = s.tables.includes(tableNum)
-      // Remove from any other section first, then add/remove here
-      return { ...s, tables: has ? s.tables.filter(t => t !== tableNum) : [...s.tables, tableNum].sort((a,b)=>a-b) }
-    }))
-  }
   const [colorPickerOpen, setColorPickerOpen] = useState(null)
 
+  function addSection() {
+    setOverrides(o => {
+      const prev = o.table_sections ?? baseForm.table_sections ?? []
+      return {
+        ...o,
+        table_sections: [...prev, {
+          id: Date.now().toString(),
+          name: '',
+          color: SECTION_COLORS[prev.length % SECTION_COLORS.length].id,
+          tables: [],
+        }],
+      }
+    })
+  }
+  function removeSection(id) {
+    setOverrides(o => ({
+      ...o,
+      table_sections: (o.table_sections ?? baseForm.table_sections ?? []).filter(s => s.id !== id),
+    }))
+  }
+  function updateSection(id, key, val) {
+    setOverrides(o => ({
+      ...o,
+      table_sections: (o.table_sections ?? baseForm.table_sections ?? []).map(s => s.id === id ? { ...s, [key]: val } : s),
+    }))
+  }
+  function toggleTableInSection(sectionId, tableNum) {
+    setOverrides(o => ({
+      ...o,
+      table_sections: (o.table_sections ?? baseForm.table_sections ?? []).map(s => {
+        if (s.id !== sectionId) return s
+        const has = s.tables.includes(tableNum)
+        return { ...s, tables: has ? s.tables.filter(t => t !== tableNum) : [...s.tables, tableNum].sort((a,b)=>a-b) }
+      }),
+    }))
+  }
+
   const saveTablesMut = useMutation({
-    mutationFn: () => updateProfile({ table_count: tableCount, table_sections: tableSections }),
-    onSuccess: () => { toast.success('Table settings saved!'); qc.invalidateQueries({ queryKey: ['profile'] }) },
+    mutationFn: () => updateProfile({ table_count: form.table_count, table_sections: form.table_sections }),
+    onSuccess: () => {
+      toast.success('Table settings saved!')
+      setOverrides(o => Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'table_count' && k !== 'table_sections')))
+      qc.invalidateQueries({ queryKey: ['profile'] })
+    },
     onError: e => toast.error(String(e)),
   })
 
@@ -224,7 +234,13 @@ export default function Settings() {
                 <p className="text-xs text-muted">Receive orders automatically from Zomato</p>
               </div>
             </div>
-            <Toggle checked={form.zomato_enabled || false} onChange={() => set('zomato_enabled', !form.zomato_enabled)} label="" />
+            <button
+              role="switch" aria-checked={form.zomato_enabled || false}
+              onClick={() => set('zomato_enabled', !form.zomato_enabled)}
+              className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${form.zomato_enabled ? 'bg-green' : 'bg-border2'}`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${form.zomato_enabled ? 'left-4' : 'left-0.5'}`} />
+            </button>
           </div>
           {form.zomato_enabled && (
             <div className="space-y-2 pt-2 border-t border-border">
@@ -252,7 +268,13 @@ export default function Settings() {
                 <p className="text-xs text-muted">Receive orders automatically from Swiggy</p>
               </div>
             </div>
-            <Toggle checked={form.swiggy_enabled || false} onChange={() => set('swiggy_enabled', !form.swiggy_enabled)} label="" />
+            <button
+              role="switch" aria-checked={form.swiggy_enabled || false}
+              onClick={() => set('swiggy_enabled', !form.swiggy_enabled)}
+              className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${form.swiggy_enabled ? 'bg-green' : 'bg-border2'}`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${form.swiggy_enabled ? 'left-4' : 'left-0.5'}`} />
+            </button>
           </div>
           {form.swiggy_enabled && (
             <div className="space-y-2 pt-2 border-t border-border">
@@ -266,6 +288,34 @@ export default function Settings() {
                   <code className="text-xs text-green2 break-all">https://yourdomain.com/api/webhooks/swiggy/{profile.restaurant_id}</code>
                 </div>
               )}
+            </div>
+          )}
+        </Card>
+
+        {/* Razorpay */}
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">💳</span>
+              <div>
+                <p className="text-sm font-bold text-text">Razorpay</p>
+                <p className="text-xs text-muted">Accept UPI / card payments via Razorpay</p>
+              </div>
+            </div>
+            <button
+              role="switch" aria-checked={form.razorpay_enabled || false}
+              onClick={() => set('razorpay_enabled', !form.razorpay_enabled)}
+              className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${form.razorpay_enabled ? 'bg-green' : 'bg-border2'}`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${form.razorpay_enabled ? 'left-4' : 'left-0.5'}`} />
+            </button>
+          </div>
+          {form.razorpay_enabled && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Input label="Razorpay Key ID" placeholder="rzp_live_xxxxxxxx"
+                value={form.razorpay_key_id || ''} onChange={e => set('razorpay_key_id', e.target.value)} />
+              <Input label="Razorpay Key Secret" type="password" placeholder="Enter key secret"
+                value={form.razorpay_key_secret || ''} onChange={e => set('razorpay_key_secret', e.target.value)} />
             </div>
           )}
         </Card>
@@ -289,6 +339,9 @@ export default function Settings() {
             swiggy_enabled: form.swiggy_enabled,
             swiggy_secret: form.swiggy_secret,
             swiggy_restaurant_id: form.swiggy_restaurant_id,
+            razorpay_enabled: form.razorpay_enabled,
+            razorpay_key_id: form.razorpay_key_id,
+            ...(form.razorpay_key_secret ? { razorpay_key_secret: form.razorpay_key_secret } : {}),
           })}>
           Save Integrations
         </Button>
@@ -335,8 +388,8 @@ export default function Settings() {
             <div className="flex items-center gap-3">
               <input
                 type="number" min="1" max="100"
-                value={tableCount}
-                onChange={e => setTableCount(Number(e.target.value))}
+                value={form.table_count ?? 10}
+                onChange={e => set('table_count', Number(e.target.value))}
                 className="w-24 bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-green transition-colors"
               />
               <span className="text-xs text-muted">tables</span>
@@ -355,7 +408,7 @@ export default function Settings() {
           </Button>
         </div>
 
-        {tableSections.length === 0 && (
+        {(form.table_sections || []).length === 0 && (
           <Card className="text-center py-6">
             <UtensilsCrossed size={24} className="text-muted mx-auto mb-2" />
             <p className="text-sm text-muted">No sections yet.</p>
@@ -363,10 +416,10 @@ export default function Settings() {
           </Card>
         )}
 
-        {tableSections.map((section, idx) => {
+        {(form.table_sections || []).map((section) => {
           const colorHex = SECTION_COLORS.find(c => c.id === section.color)?.hex || '#78716c'
           const assignedInOthers = new Set(
-            tableSections.filter(s => s.id !== section.id).flatMap(s => s.tables)
+            (form.table_sections || []).filter(s => s.id !== section.id).flatMap(s => s.tables)
           )
           return (
             <Card key={section.id} className="space-y-3">
@@ -409,7 +462,7 @@ export default function Settings() {
                   Select tables for this section
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {Array.from({ length: tableCount }, (_, i) => i + 1).map(n => {
+                  {Array.from({ length: form.table_count ?? 10 }, (_, i) => i + 1).map(n => {
                     const selected = section.tables.includes(n)
                     const locked   = !selected && assignedInOthers.has(n)
                     return (
@@ -535,7 +588,7 @@ export default function Settings() {
           footer={<>
             <Button variant="secondary" onClick={() => setEditMember(null)}>Cancel</Button>
             <Button variant="primary" loading={updateMut.isPending}
-              onClick={() => updateMut.mutate({ id: editMember.id, name: teamForm.name, role: teamForm.role })}>
+              onClick={() => updateMut.mutate({ id: editMember.id, name: teamForm.name, role: teamForm.role, ...(teamForm.password ? { password: teamForm.password } : {}) })}>
               Save
             </Button>
           </>}>

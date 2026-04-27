@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { login, register } from '../api/auth'
+import { login } from '../api/auth'
 import { useAuthStore } from '../store/auth'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import logoText from '../assets/logo-text.png'
 
 export default function Login() {
-  const [tab, setTab] = useState('login')
   const [form, setForm] = useState({})
   const setAuth = useAuthStore(s => s.setAuth)
   const navigate = useNavigate()
@@ -18,12 +18,6 @@ export default function Login() {
   const loginMut = useMutation({
     mutationFn: () => login({ email: form.email, password: form.password }),
     onSuccess: (data) => { setAuth(data); toast.success(`Welcome back, ${data.name}!`); navigate('/') },
-    onError:   (e)    => toast.error(String(e)),
-  })
-
-  const regMut = useMutation({
-    mutationFn: () => register({ name: form.name, restaurant_name: form.restaurant, email: form.email, phone: form.phone, password: form.password }),
-    onSuccess: (data) => { setAuth(data); toast.success('Account created! Welcome 🎉'); navigate('/') },
     onError:   (e)    => toast.error(String(e)),
   })
 
@@ -37,62 +31,32 @@ export default function Login() {
 
       <div className="w-full max-w-md relative">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="font-display font-black text-4xl text-green tracking-tight">
-            Bill<span className="text-orange">Byte</span>
-          </h1>
-          <p className="text-sm text-text3 mt-1">Restaurant OS — sign in to continue</p>
+        <div className="flex justify-center mb-4">
+          <img src={logoText} alt="BillByte" className="w-40 object-contain" style={{ mixBlendMode: 'multiply' }} />
         </div>
 
         <div className="bg-surface border border-border rounded-2xl shadow-lg overflow-hidden">
-          {/* Tabs */}
-          <div className="flex border-b border-border">
-            {['login','register'].map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`flex-1 py-3.5 text-sm font-semibold transition-colors ${tab===t ? 'text-green border-b-2 border-green -mb-px bg-green-dim' : 'text-text3 hover:text-text'}`}>
-                {t === 'login' ? 'Sign In' : 'Register'}
-              </button>
-            ))}
+          <div className="border-b border-border px-6 py-3.5">
+            <p className="text-sm font-semibold text-green">Sign In</p>
           </div>
 
           <div className="p-6">
-            {tab === 'login' ? (
-              <div className="flex flex-col gap-4">
-                <Input label="Email" type="email" placeholder="you@restaurant.com" autoComplete="email"
-                  value={form.email || ''} onChange={e => set('email', e.target.value)} />
-                <Input label="Password" type="password" placeholder="••••••••" autoComplete="current-password"
-                  value={form.password || ''} onChange={e => set('password', e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && loginMut.mutate()} />
-                <Button variant="primary" size="lg" className="w-full mt-1"
-                  loading={loginMut.isPending} onClick={() => loginMut.mutate()}>
-                  Sign In →
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label="Your Name" placeholder="Rahul Kumar"
-                    value={form.name || ''} onChange={e => set('name', e.target.value)} />
-                  <Input label="Phone" placeholder="+91 98765 43210"
-                    value={form.phone || ''} onChange={e => set('phone', e.target.value)} />
-                </div>
-                <Input label="Restaurant Name" placeholder="Spice Garden"
-                  value={form.restaurant || ''} onChange={e => set('restaurant', e.target.value)} />
-                <Input label="Email" type="email" placeholder="you@restaurant.com"
-                  value={form.email || ''} onChange={e => set('email', e.target.value)} />
-                <Input label="Password" type="password" placeholder="Min 8 characters"
-                  value={form.password || ''} onChange={e => set('password', e.target.value)} />
-                <Button variant="primary" size="lg" className="w-full mt-1"
-                  loading={regMut.isPending} onClick={() => regMut.mutate()}>
-                  Create Account →
-                </Button>
-              </div>
-            )}
+            <div className="flex flex-col gap-4">
+              <Input label="Email" type="email" placeholder="you@restaurant.com" autoComplete="email"
+                value={form.email || ''} onChange={e => set('email', e.target.value)} />
+              <Input label="Password" type="password" placeholder="••••••••" autoComplete="current-password"
+                value={form.password || ''} onChange={e => set('password', e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && loginMut.mutate()} />
+              <Button variant="primary" size="lg" className="w-full mt-1"
+                loading={loginMut.isPending} onClick={() => loginMut.mutate()}>
+                Sign In →
+              </Button>
+            </div>
           </div>
         </div>
 
         <p className="text-center text-xs text-muted mt-4">
-          14-day free trial · No credit card required
+          Powered by BillByte Restaurant OS
         </p>
       </div>
     </div>

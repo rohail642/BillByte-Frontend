@@ -74,9 +74,17 @@ export default function Sidebar() {
       )}>
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 h-[60px] border-b border-border flex-shrink-0">
-          <div className="font-display font-black text-xl text-green tracking-tight">
-            Bill<span className="text-orange">Byte</span>
+          <div className="font-display font-black text-xl text-text2 tracking-tight">
+            Bill<span className="text-green">Byte</span>
           </div>
+          <span className={clsx(
+            'text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0',
+            role === 'owner'   && 'bg-purple-dim text-purple',
+            role === 'cashier' && 'bg-blue-dim text-blue',
+            role === 'waiter'  && 'bg-surface3 text-muted',
+          )}>
+            {role}
+          </span>
           <div className="ml-auto w-2 h-2 rounded-full bg-green animate-pulse" />
         </div>
 

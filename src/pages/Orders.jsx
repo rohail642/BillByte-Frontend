@@ -11,149 +11,17 @@ import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
 import { formatINR, statusColor } from '../utils'
 import { CreditCard, RefreshCw, X, ChevronDown, Printer } from 'lucide-react'
+import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 
 const STATUS_LABELS = { pending:'Pending', kot_sent:'KOT Sent', preparing:'Preparing', ready:'Ready', served:'Served', paid:'Paid', cancelled:'Cancelled' }
 
-// Simplified filters — maps a filter key to which real statuses to fetch
 const FILTERS = [
   { key: '',        label: 'All',    statuses: [] },
   { key: 'active',  label: 'Active', statuses: ['pending','kot_sent','preparing'] },
   { key: 'ready',   label: 'Ready',  statuses: ['ready','served'] },
   { key: 'paid',    label: 'Paid',   statuses: ['paid'] },
 ]
-const PAY_ICONS     = { cash:'💵', upi:'📱', card:'💳', print:'🖨️' }
-
-function Receipt({ order, profile }) {
-  const restaurant = profile || {}
-  return (
-    <div id="receipt-content" style={{ fontFamily: 'monospace', fontSize: 13, maxWidth: 320, margin: '0 auto', padding: 16 }}>
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: 12 }}>
-        <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 900, fontSize: 22, color: '#16a34a' }}>
-          {restaurant.restaurant_name || 'BillByte Restaurant'}
-        </div>
-        {restaurant.address && <div style={{ fontSize: 11, color: '#78716c', marginTop: 2 }}>{restaurant.address}</div>}
-        {restaurant.city    && <div style={{ fontSize: 11, color: '#78716c' }}>{restaurant.city}</div>}
-        {restaurant.phone   && <div style={{ fontSize: 11, color: '#78716c' }}>{restaurant.phone}</div>}
-        {restaurant.gstin   && <div style={{ fontSize: 11, color: '#78716c', marginTop: 2 }}>GSTIN: {restaurant.gstin}</div>}
-        {restaurant.fssai   && <div style={{ fontSize: 11, color: '#78716c' }}>FSSAI: {restaurant.fssai}</div>}
-      </div>
-
-      <div style={{ borderTop: '1px dashed #d4cec6', margin: '8px 0' }} />
-
-      {/* Order meta */}
-      <div style={{ fontSize: 11, color: '#78716c', marginBottom: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Order #</span><span style={{ color: '#1c1917', fontWeight: 700 }}>{order.order_number}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Date</span><span>{new Date(order.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Time</span><span>{new Date(order.created_at).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}</span>
-        </div>
-        {order.table_number && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Table</span><span>{order.table_number}</span>
-          </div>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Type</span><span style={{ textTransform: 'capitalize' }}>{order.order_type?.replace('_',' ')}</span>
-        </div>
-        {order.customer_name && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Customer</span><span>{order.customer_name}</span>
-          </div>
-        )}
-        {order.payment_method && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Payment</span>
-            <span style={{ textTransform: 'uppercase', fontWeight: 700, color: '#16a34a' }}>
-              {PAY_ICONS[order.payment_method]} {order.payment_method}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div style={{ borderTop: '1px dashed #d4cec6', margin: '8px 0' }} />
-
-      {/* Items */}
-      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ color: '#78716c', fontSize: 10 }}>
-            <th style={{ textAlign: 'left', paddingBottom: 4 }}>Item</th>
-            <th style={{ textAlign: 'center', paddingBottom: 4 }}>Qty</th>
-            <th style={{ textAlign: 'right', paddingBottom: 4 }}>Price</th>
-            <th style={{ textAlign: 'right', paddingBottom: 4 }}>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(() => {
-            const grouped = []
-            ;(order.items || []).forEach(item => {
-              const ex = grouped.find(g => g.name === item.name && g.price === item.price)
-              if (ex) { ex.quantity += item.quantity; ex.total += item.total }
-              else grouped.push({ ...item })
-            })
-            return grouped.map((item, i) => (
-              <tr key={i}>
-                <td style={{ paddingBottom: 3, color: '#1c1917' }}>{item.name}</td>
-                <td style={{ textAlign: 'center', color: '#78716c' }}>×{item.quantity}</td>
-                <td style={{ textAlign: 'right', color: '#78716c' }}>₹{item.price}</td>
-                <td style={{ textAlign: 'right', fontWeight: 600, color: '#1c1917' }}>₹{item.total}</td>
-              </tr>
-            ))
-          })()}
-        </tbody>
-      </table>
-
-      <div style={{ borderTop: '1px dashed #d4cec6', margin: '8px 0' }} />
-
-      {/* Totals */}
-      <div style={{ fontSize: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#78716c', marginBottom: 2 }}>
-          <span>Subtotal</span><span>₹{order.subtotal}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#78716c', marginBottom: 2 }}>
-          <span>GST ({((order.gst_amount / order.subtotal) * 100).toFixed(0)}%)</span>
-          <span>₹{order.gst_amount}</span>
-        </div>
-        {order.discount_amount > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ea580c', marginBottom: 2 }}>
-            <span>Discount</span><span>-₹{order.discount_amount}</span>
-          </div>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: 15, marginTop: 6, color: '#16a34a' }}>
-          <span>TOTAL</span><span>₹{order.total_amount}</span>
-        </div>
-      </div>
-
-      <div style={{ borderTop: '1px dashed #d4cec6', margin: '12px 0' }} />
-
-      {/* Footer */}
-      <div style={{ textAlign: 'center', color: '#78716c', fontSize: 11 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#1c1917', marginBottom: 4 }}>Thank you for dining with us! 🙏</div>
-        <div>We hope to see you again soon.</div>
-        {restaurant.phone && <div style={{ marginTop: 4 }}>📞 {restaurant.phone}</div>}
-        <div style={{ marginTop: 8, fontSize: 10, color: '#a8a29e' }}>Powered by BillByte</div>
-      </div>
-    </div>
-  )
-}
-
-function printReceipt() {
-  const content = document.getElementById('receipt-content')
-  if (!content) return
-  const win = window.open('', '_blank', 'width=400,height=700')
-  win.document.write(`
-    <html><head><title>Receipt</title>
-    <style>body{margin:0;padding:16px;font-family:monospace;} @media print{body{margin:0}}</style>
-    </head><body>${content.innerHTML}</body></html>
-  `)
-  win.document.close()
-  win.focus()
-  setTimeout(() => { win.print(); win.close() }, 300)
-}
+const PAY_ICONS = { cash:'💵', upi:'📱', card:'💳', print:'🖨️' }
 
 export default function Orders() {
   const qc = useQueryClient()
@@ -382,7 +250,7 @@ export default function Orders() {
       <Modal open={!!receiptModal} onClose={() => setReceiptModal(null)} title="🧾 Receipt">
         {receiptModal && (
           <div>
-            <Receipt order={receiptModal} profile={profile} />
+            <ReceiptView order={receiptModal} profile={profile} />
             <div className="flex gap-2 justify-center mt-4 pt-4 border-t border-border">
               <Button variant="primary" icon={<Printer size={14}/>} onClick={printReceipt}>
                 Print Receipt
