@@ -190,18 +190,21 @@ export default function Settings() {
         <h3 className="font-display font-bold text-sm text-text">Restaurant Profile</h3>
         {isLoading ? <div className="flex justify-center py-12"><Spinner size="lg" /></div> : (
           <Card className="space-y-3">
-            <Input label="Restaurant Name" value={form.restaurant_name || ''} onChange={e => set('restaurant_name', e.target.value)} placeholder="e.g. Spice Garden" />
+            <div className="bg-amber-dim border border-amber/20 rounded-lg px-3 py-2">
+              <p className="text-xs font-semibold text-amber">Restaurant name, owner name, address and city can only be changed by the BillByte admin.</p>
+            </div>
+            <Input label="Restaurant Name" value={form.restaurant_name || ''} disabled />
             <div className="grid grid-cols-2 gap-3">
-              <Input label="Owner Name" value={form.name || ''} onChange={e => set('name', e.target.value)} placeholder="Your name" />
+              <Input label="Owner Name" value={form.name || ''} disabled />
               <Input label="Phone" value={form.phone || ''} onChange={e => set('phone', e.target.value)} placeholder="+91 98765 43210" />
             </div>
-            <Input label="Address" value={form.address || ''} onChange={e => set('address', e.target.value)} placeholder="12, MG Road, Bengaluru" />
+            <Input label="Address" value={form.address || ''} disabled />
             <div className="grid grid-cols-2 gap-3">
-              <Input label="City" value={form.city || ''} onChange={e => set('city', e.target.value)} placeholder="Bengaluru" />
+              <Input label="City" value={form.city || ''} disabled />
               <Input label="FSSAI No." value={form.fssai || ''} onChange={e => set('fssai', e.target.value)} placeholder="Enter FSSAI number" />
             </div>
             <Button variant="primary" size="sm" loading={saveMut.isPending}
-              onClick={() => saveMut.mutate({ name: form.name, phone: form.phone, restaurant_name: form.restaurant_name, address: form.address, city: form.city, fssai: form.fssai })}>
+              onClick={() => saveMut.mutate({ phone: form.phone, fssai: form.fssai })}>
               Save Changes
             </Button>
           </Card>
