@@ -7,6 +7,7 @@ export const addItemsToOrder    = (id, body)   => client.post(`/orders/${id}/add
 export const removeOrderItem    = (orderId, itemId) => client.delete(`/orders/${orderId}/items/${itemId}`)
 export const getOrder           = id           => client.get(`/orders/${id}`)
 export const updateStatus       = (id, status) => client.patch(`/orders/${id}/status`, { status })
+export const updateKotStatus    = (id, kotNum, status) => client.patch(`/orders/${id}/kot/${kotNum}/status`, { status })
 export const collectPayment     = (id, body)   => client.patch(`/orders/${id}/pay`, body)
 export const getDashboardSummary  = ()          => client.get('/orders/summary')
 export const collectAllForTable   = (table, body) => client.patch(`/orders/table/${table}/collect-all`, body)

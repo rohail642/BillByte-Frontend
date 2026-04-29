@@ -182,7 +182,7 @@ export default function POSTerminal() {
 
                     {selectedTable?.table_number === table.table_number && (
                       <div className="mt-2 pt-2 border-t border-border space-y-1">
-                        {table.orders.flatMap(o => o.items).map((item, i) => (
+                        {table.orders.flatMap(o => o.items).filter(item => !item.cancelled_at).map((item, i) => (
                           <div key={i} className="flex justify-between text-[10px] text-text2">
                             <span>{item.name} ×{item.quantity}</span>
                             <span>{formatINR(item.total)}</span>

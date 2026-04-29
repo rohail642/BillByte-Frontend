@@ -24,7 +24,13 @@ client.interceptors.response.use(
       localStorage.removeItem('bb_auth')
       window.location.href = '/login'
     }
-    return Promise.reject(err.response?.data?.detail || err.message || 'Request failed')
+    const detail = err.response?.data?.detail
+    const message = Array.isArray(detail)
+      ? detail[0]?.msg || 'Validation error'
+      : typeof detail === 'string'
+        ? detail
+        : err.message || 'Request failed'
+    return Promise.reject(message)
   }
 )
 

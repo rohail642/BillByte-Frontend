@@ -17,7 +17,8 @@ const NAV_CONFIG = [
       { to: '/billing',       icon: Receipt,          label: 'Billing / POS', roles: ['cashier'] },
       { to: '/tables',        icon: UtensilsCrossed,  label: 'Tables',        roles: ['cashier'] },
       { to: '/orders',        icon: ClipboardList,    label: 'Orders',        roles: ['owner', 'cashier'] },
-      { to: '/online-orders', icon: Bike,             label: 'Online Orders', roles: ['owner', 'cashier'] },
+      { to: '/online-orders', icon: Bike,             label: 'Online Orders',    roles: ['owner', 'cashier'] },
+      { to: '/kitchen',       icon: ChefHat,          label: 'Kitchen Display',  roles: ['kitchen'] },
       { to: '/menu',          icon: UtensilsCrossed,  label: 'Menu',          roles: ['owner'] },
     ],
   },
@@ -82,6 +83,7 @@ export default function Sidebar() {
             role === 'owner'   && 'bg-purple-dim text-purple',
             role === 'cashier' && 'bg-blue-dim text-blue',
             role === 'waiter'  && 'bg-surface3 text-muted',
+            role === 'kitchen' && 'bg-orange-dim text-orange',
           )}>
             {role}
           </span>

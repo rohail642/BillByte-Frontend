@@ -15,6 +15,7 @@ import Settings from './pages/Settings'
 import WaiterView from './pages/WaiterView'
 import CashierTables from './pages/CashierTables'
 import POSTerminal from './pages/POSTerminal'
+import KitchenDisplay from './pages/KitchenDisplay'
 
 function useRole() {
   return useAuthStore(s => s.user?.role) || 'owner'
@@ -23,6 +24,7 @@ function useRole() {
 function homeFor(role) {
   if (role === 'waiter')  return '/waiter'
   if (role === 'cashier') return '/pos'
+  if (role === 'kitchen') return '/kitchen'
   return '/'
 }
 
@@ -48,8 +50,9 @@ function RoleRoute({ allowed, children }) {
 // Index route: sends each role to their proper home page
 function HomeRedirect() {
   const role = useRole()
-  if (role === 'cashier') return <Navigate to="/pos"    replace />
-  if (role === 'waiter')  return <Navigate to="/waiter" replace />
+  if (role === 'cashier') return <Navigate to="/pos"     replace />
+  if (role === 'waiter')  return <Navigate to="/waiter"  replace />
+  if (role === 'kitchen') return <Navigate to="/kitchen" replace />
   return <Dashboard />
 }
 
@@ -64,6 +67,15 @@ export default function App() {
           <ProtectedRoute>
             <RoleRoute allowed={['waiter']}>
               <WaiterView />
+            </RoleRoute>
+          </ProtectedRoute>
+        } />
+
+        {/* Kitchen — full-screen, no sidebar */}
+        <Route path="/kitchen" element={
+          <ProtectedRoute>
+            <RoleRoute allowed={['kitchen']}>
+              <KitchenDisplay />
             </RoleRoute>
           </ProtectedRoute>
         } />

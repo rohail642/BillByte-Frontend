@@ -193,7 +193,7 @@ export default function Orders() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(order.items || []).map(item => (
+                      {(order.items || []).filter(item => !item.cancelled_at).map(item => (
                         <tr key={item.id} className="border-t border-border">
                           <td className="py-1.5 text-text2 font-medium">{item.name}</td>
                           <td className="py-1.5 text-center text-muted">×{item.quantity}</td>

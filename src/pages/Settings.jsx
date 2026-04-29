@@ -177,11 +177,11 @@ export default function Settings() {
     onError: e => toast.error(String(e)),
   })
 
-  const ROLE_COLORS = { owner: 'purple', manager: 'blue', cashier: 'green', waiter: 'gray' }
+  const ROLE_COLORS = { owner: 'purple', cashier: 'green', waiter: 'gray', kitchen: 'orange' }
   const ROLE_ACCESS_LABELS = {
-    manager: 'Dashboard, Billing, Orders, Menu, Inventory, CRM, Staff, Reports',
-    cashier:  'Billing, Orders, CRM only',
-    waiter:   'Billing and Orders only',
+    cashier: 'Billing, Orders, CRM only',
+    waiter:  'Billing and Orders only',
+    kitchen: 'Kitchen Display only',
   }
 
   const content = {
@@ -555,7 +555,7 @@ export default function Settings() {
 
             {(team || []).length === 0 && (
               <Card className="text-center py-6">
-                <p className="text-sm text-muted">No team members yet. Add waiters, cashiers or managers.</p>
+                <p className="text-sm text-muted">No team members yet. Add waiters, cashiers or kitchen staff.</p>
               </Card>
             )}
           </div>
@@ -578,7 +578,7 @@ export default function Settings() {
             <Select label="Role" value={teamForm.role||'waiter'} onChange={e=>setTF('role',e.target.value)}>
               <option value="waiter">Waiter — Billing & Orders only</option>
               <option value="cashier">Cashier — Billing, Orders & CRM</option>
-              <option value="manager">Manager — Everything except Settings & Salaries</option>
+              <option value="kitchen">Kitchen — Kitchen Display only</option>
             </Select>
           </div>
         </Modal>
@@ -597,7 +597,7 @@ export default function Settings() {
             <Select label="Role" value={teamForm.role||'waiter'} onChange={e=>setTF('role',e.target.value)}>
               <option value="waiter">Waiter</option>
               <option value="cashier">Cashier</option>
-              <option value="manager">Manager</option>
+              <option value="kitchen">Kitchen</option>
             </Select>
             <Input label="New Password (leave blank to keep)" type="password" placeholder="Optional"
               value={teamForm.password||''} onChange={e=>setTF('password',e.target.value)} />

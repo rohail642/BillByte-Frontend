@@ -20,7 +20,7 @@ const STATUS_CONFIG = {
 }
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-const ROLES = ['Head Chef','Sous Chef','Waiter','Cashier','Delivery','Cleaner','Manager','Barista']
+const ROLES = ['Head Chef','Sous Chef','Waiter','Cashier','Delivery','Cleaner','Kitchen','Barista']
 
 // ── Attendance Calendar ────────────────────────────────────────────────────
 function AttendanceCalendar({ staffId }) {

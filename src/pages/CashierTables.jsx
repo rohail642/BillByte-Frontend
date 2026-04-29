@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus } from '../api/orders'
+import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus, removeOrderItem } from '../api/orders'
 import { getMenuItems, getCategories } from '../api/menu'
 import { getProfile } from '../api/auth'
 import toast from 'react-hot-toast'
@@ -42,9 +42,15 @@ export default function CashierTables() {
 
   const { data: tableOrder } = useQuery({
     queryKey: ['tableOrder', selectedTable],
-    queryFn: () => getTableOrder(selectedTable),
+    queryFn: () => getTableOrder(selectedTable).catch(err => {
+      if (err?.response?.status === 404) return null
+      throw err
+    }),
     enabled: !!selectedTable,
     retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: 8000,
   })
 
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories })
@@ -58,11 +64,21 @@ export default function CashierTables() {
     return items
   }, [menuItems, activeCategory, search])
 
+  const cancelItemMut = useMutation({
+    mutationFn: ({ orderId, itemId }) => removeOrderItem(orderId, itemId),
+    onSuccess: () => {
+      toast.success('Item cancelled — kitchen notified')
+      qc.invalidateQueries({ queryKey: ['tableOrder', selectedTable] })
+      qc.invalidateQueries({ queryKey: ['activeTables'] })
+    },
+    onError: e => toast.error(String(e?.response?.data?.detail || e?.message || 'Failed to cancel item')),
+  })
+
   const sendMut = useMutation({
     mutationFn: async () => {
       if (cart.length === 0) throw new Error('Add at least one item')
       const items = cart.map(c => ({ menu_item_id: c.id, name: c.name, price: c.price, quantity: c.qty }))
-      let orderId = tableOrder?.id
+      let orderId = activeTableOrder?.id
 
       if (orderId) {
         await addItemsToOrder(orderId, { items })
@@ -76,9 +92,9 @@ export default function CashierTables() {
     onSuccess: () => {
       toast.success(`Order sent to kitchen — Table ${selectedTable}`)
       setCart([])
-      setSelectedTable(null)
+      qc.removeQueries({ queryKey: ['tableOrder', selectedTable] })
       qc.invalidateQueries({ queryKey: ['activeTables'] })
-      qc.invalidateQueries({ queryKey: ['tableOrder', selectedTable] })
+      setSelectedTable(null)
     },
     onError: e => {
       const msg = e?.response?.data?.detail
@@ -103,7 +119,9 @@ export default function CashierTables() {
   }
 
   const cartTotal = cart.reduce((sum, c) => sum + c.price * c.qty, 0)
-  const existingItems = tableOrder?.items || []
+  // Never show items from a paid/cancelled order even if the cache is stale
+  const activeTableOrder = (tableOrder && !['paid', 'cancelled'].includes(tableOrder.status)) ? tableOrder : null
+  const existingItems = activeTableOrder?.items || []
 
   const sections = profile?.table_sections || []
   const assignedNums = new Set(sections.flatMap(s => s.tables))
@@ -113,7 +131,11 @@ export default function CashierTables() {
     const active = activeTableNums.has(String(n))
     return (
       <button
-        onClick={() => { setSelectedTable(n); setCart([]) }}
+        onClick={() => {
+          qc.removeQueries({ queryKey: ['tableOrder', n] })
+          setSelectedTable(n)
+          setCart([])
+        }}
         className={clsx(
           'aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border-2 transition-all font-semibold text-sm',
           active
@@ -179,7 +201,7 @@ export default function CashierTables() {
           <div className="w-72 lg:w-80 flex-shrink-0 border-r border-border flex flex-col bg-bg2">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
               <h2 className="font-bold text-text flex-1">Table {selectedTable}</h2>
-              <button onClick={() => { setSelectedTable(null); setCart([]) }} className="text-muted hover:text-text p-1 rounded">
+              <button onClick={() => { qc.removeQueries({ queryKey: ['tableOrder', selectedTable] }); setSelectedTable(null); setCart([]) }} className="text-muted hover:text-text p-1 rounded">
                 <X size={16} />
               </button>
             </div>
@@ -189,13 +211,34 @@ export default function CashierTables() {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">Current Order</p>
                   <div className="space-y-1">
-                    {existingItems.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between text-sm py-1">
-                        <span className="text-text2 flex-1 truncate">{item.name}</span>
-                        <span className="text-muted mx-2">×{item.quantity}</span>
-                        <span className="text-text font-medium">{formatINR(item.price * item.quantity)}</span>
-                      </div>
-                    ))}
+                    {existingItems.map((item) => {
+                      const isCancelled = !!item.cancelled_at
+                      const isCancelling = cancelItemMut.isPending && cancelItemMut.variables?.itemId === item.id
+                      return (
+                        <div key={item.id} className={clsx('flex items-center gap-1 text-sm py-1', isCancelled && 'opacity-40')}>
+                          <span className={clsx('text-text2 flex-1 truncate', isCancelled && 'line-through')}>{item.name}</span>
+                          <span className="text-muted">×{item.quantity}</span>
+                          <span className="text-text font-medium w-16 text-right">{formatINR(item.price * item.quantity)}</span>
+                          {!isCancelled && activeTableOrder?.id && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Cancel "${item.name}"? Kitchen will be notified.`)) {
+                                  cancelItemMut.mutate({ orderId: activeTableOrder.id, itemId: item.id })
+                                }
+                              }}
+                              disabled={isCancelling}
+                              className="ml-1 w-5 h-5 rounded flex items-center justify-center text-muted hover:text-red hover:bg-red-dim transition-colors flex-shrink-0"
+                              title="Cancel item"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                          {isCancelled && (
+                            <span className="ml-1 text-[9px] font-bold uppercase text-red flex-shrink-0">Void</span>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

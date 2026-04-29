@@ -15,7 +15,7 @@ export default function ReceiptView({ order, profile }) {
 
   const items = (() => {
     const grouped = []
-    ;(order.items || []).forEach(item => {
+    ;(order.items || []).filter(item => !item.cancelled_at).forEach(item => {
       const ex = grouped.find(g => g.name === item.name && g.price === item.price)
       if (ex) { ex.quantity += item.quantity; ex.total += item.total }
       else grouped.push({ ...item })
