@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuthStore } from './store/auth'
 import AppLayout from './components/layout/AppLayout'
 import Login from './pages/Login'
@@ -19,6 +20,28 @@ import KitchenDisplay from './pages/KitchenDisplay'
 
 function useRole() {
   return useAuthStore(s => s.user?.role) || 'owner'
+}
+
+// Handles ?impersonate=<token> URL param set by admin panel
+function ImpersonateHandler() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('impersonate')
+    if (!token) return
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      useAuthStore.setState({
+        token,
+        user: { id: parseInt(payload.sub), role: 'owner', name: 'Owner' },
+        restaurantId: payload.restaurant_id,
+        restaurantName: null,
+      })
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+    } catch (e) {
+      console.error('Impersonate failed', e)
+    }
+  }, [])
+  return null
 }
 
 function homeFor(role) {
@@ -59,6 +82,7 @@ function HomeRedirect() {
 export default function App() {
   return (
     <HashRouter>
+      <ImpersonateHandler />
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
 
@@ -85,34 +109,34 @@ export default function App() {
           <Route index element={<HomeRedirect />} />
 
           <Route path="pos" element={
-            <RoleRoute allowed={['cashier', 'owner']}><POSTerminal /></RoleRoute>
+            <RoleRoute allowed={['cashier', 'owner', 'manager']}><POSTerminal /></RoleRoute>
           } />
           <Route path="billing" element={
-            <RoleRoute allowed={['cashier']}><Billing /></RoleRoute>
+            <RoleRoute allowed={['cashier', 'manager']}><Billing /></RoleRoute>
           } />
           <Route path="tables" element={
-            <RoleRoute allowed={['cashier']}><CashierTables /></RoleRoute>
+            <RoleRoute allowed={['cashier', 'manager']}><CashierTables /></RoleRoute>
           } />
           <Route path="orders" element={
-            <RoleRoute allowed={['owner', 'cashier']}><Orders /></RoleRoute>
+            <RoleRoute allowed={['owner', 'cashier', 'manager']}><Orders /></RoleRoute>
           } />
           <Route path="online-orders" element={
-            <RoleRoute allowed={['owner', 'cashier']}><OnlineOrders /></RoleRoute>
+            <RoleRoute allowed={['owner', 'cashier', 'manager']}><OnlineOrders /></RoleRoute>
           } />
           <Route path="menu" element={
-            <RoleRoute allowed={['owner']}><Menu /></RoleRoute>
+            <RoleRoute allowed={['owner', 'manager']}><Menu /></RoleRoute>
           } />
           <Route path="inventory" element={
-            <RoleRoute allowed={['owner', 'cashier']}><Inventory /></RoleRoute>
+            <RoleRoute allowed={['owner', 'cashier', 'manager']}><Inventory /></RoleRoute>
           } />
           <Route path="crm" element={
-            <RoleRoute allowed={['owner', 'cashier']}><CRM /></RoleRoute>
+            <RoleRoute allowed={['owner', 'cashier', 'manager']}><CRM /></RoleRoute>
           } />
           <Route path="staff" element={
-            <RoleRoute allowed={['owner']}><Staff /></RoleRoute>
+            <RoleRoute allowed={['owner', 'manager']}><Staff /></RoleRoute>
           } />
           <Route path="reports" element={
-            <RoleRoute allowed={['owner']}><Reports /></RoleRoute>
+            <RoleRoute allowed={['owner', 'manager']}><Reports /></RoleRoute>
           } />
           <Route path="settings" element={
             <RoleRoute allowed={['owner']}><Settings /></RoleRoute>

@@ -13,22 +13,22 @@ const NAV_CONFIG = [
   {
     label: 'Main',
     items: [
-      { to: '/',              icon: LayoutDashboard, label: 'Dashboard',      roles: ['owner'] },
-      { to: '/billing',       icon: Receipt,          label: 'Billing / POS', roles: ['cashier'] },
-      { to: '/tables',        icon: UtensilsCrossed,  label: 'Tables',        roles: ['cashier'] },
-      { to: '/orders',        icon: ClipboardList,    label: 'Orders',        roles: ['owner', 'cashier'] },
-      { to: '/online-orders', icon: Bike,             label: 'Online Orders',    roles: ['owner', 'cashier'] },
+      { to: '/',              icon: LayoutDashboard, label: 'Dashboard',      roles: ['owner', 'manager'] },
+      { to: '/billing',       icon: Receipt,          label: 'Billing / POS', roles: ['cashier', 'manager'] },
+      { to: '/tables',        icon: UtensilsCrossed,  label: 'Tables',        roles: ['cashier', 'manager'] },
+      { to: '/orders',        icon: ClipboardList,    label: 'Orders',        roles: ['owner', 'cashier', 'manager'] },
+      { to: '/online-orders', icon: Bike,             label: 'Online Orders',    roles: ['owner', 'cashier', 'manager'] },
       { to: '/kitchen',       icon: ChefHat,          label: 'Kitchen Display',  roles: ['kitchen'] },
-      { to: '/menu',          icon: UtensilsCrossed,  label: 'Menu',          roles: ['owner'] },
+      { to: '/menu',          icon: UtensilsCrossed,  label: 'Menu',          roles: ['owner', 'manager'] },
     ],
   },
   {
     label: 'Management',
     items: [
-      { to: '/inventory', icon: Package,   label: 'Inventory', roles: ['owner', 'cashier'], badge: true },
-      { to: '/crm',       icon: Users,     label: 'CRM',       roles: ['owner', 'cashier'] },
-      { to: '/staff',     icon: ChefHat,   label: 'Staff',     roles: ['owner'] },
-      { to: '/reports',   icon: BarChart2, label: 'Reports',   roles: ['owner'] },
+      { to: '/inventory', icon: Package,   label: 'Inventory', roles: ['owner', 'cashier', 'manager'], badge: true, module: 'inventory' },
+      { to: '/crm',       icon: Users,     label: 'CRM',       roles: ['owner', 'cashier', 'manager'], module: 'crm' },
+      { to: '/staff',     icon: ChefHat,   label: 'Staff',     roles: ['owner', 'manager'],             module: 'staff' },
+      { to: '/reports',   icon: BarChart2, label: 'Reports',   roles: ['owner', 'manager'],             module: 'reports' },
     ],
   },
   {
@@ -41,7 +41,7 @@ const NAV_CONFIG = [
 
 export default function Sidebar() {
   const { sidebarOpen, closeSidebar } = useUIStore()
-  const { user, restaurantName, clearAuth } = useAuthStore()
+  const { user, restaurantName, clearAuth, enabledModules } = useAuthStore()
   const navigate = useNavigate()
   const role = user?.role || 'owner'
 
@@ -56,7 +56,10 @@ export default function Sidebar() {
   const visibleGroups = NAV_CONFIG
     .map(group => ({
       ...group,
-      items: group.items.filter(item => item.roles.includes(role)),
+      items: group.items.filter(item =>
+        item.roles.includes(role) &&
+        (!item.module || (enabledModules ? enabledModules[item.module] !== false : true))
+      ),
     }))
     .filter(group => group.items.length > 0)
 
@@ -81,6 +84,7 @@ export default function Sidebar() {
           <span className={clsx(
             'text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0',
             role === 'owner'   && 'bg-purple-dim text-purple',
+            role === 'manager' && 'bg-amber-dim text-amber',
             role === 'cashier' && 'bg-blue-dim text-blue',
             role === 'waiter'  && 'bg-surface3 text-muted',
             role === 'kitchen' && 'bg-orange-dim text-orange',
