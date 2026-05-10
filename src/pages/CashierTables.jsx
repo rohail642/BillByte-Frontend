@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus, removeOrderItem } from '../api/orders'
+import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus, removeOrderItem, collectPayment } from '../api/orders'
 import { getMenuItems, getCategories } from '../api/menu'
 import { getProfile } from '../api/auth'
 import toast from 'react-hot-toast'
-import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed } from 'lucide-react'
+import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatINR } from '../utils'
+import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
+import Modal from '../components/ui/Modal'
 
 const SECTION_COLORS = {
   blue:   '#3b82f6',
@@ -25,6 +27,9 @@ export default function CashierTables() {
   const [cart, setCart] = useState([])
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
+  const [payModal, setPayModal] = useState(false)
+  const [receiptModal, setReceiptModal] = useState(null)
+  const [discountPercent, setDiscountPercent] = useState('')
 
   const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: getProfile })
   const tableCount = profile?.table_count ?? 10
@@ -101,6 +106,35 @@ export default function CashierTables() {
       if (Array.isArray(msg)) toast.error(msg.map(m => m.msg).join(', '))
       else toast.error(String(msg || e?.message || 'Something went wrong'))
     },
+  })
+
+  const payMut = useMutation({
+    mutationFn: async (payMethod) => {
+      const gstRate = profile?.gst_rate ?? 5
+      const disc = parseFloat(discountPercent) || 0
+      const order = await collectPayment(activeTableOrder.id, {
+        payment_method: payMethod,
+        discount_percent: disc,
+      })
+      order.payment_method = payMethod
+      // compute totals for receipt
+      const activeItems = (activeTableOrder.items || []).filter(i => !i.cancelled_at)
+      const subtotal = activeItems.reduce((s, i) => s + i.price * i.quantity, 0)
+      const discAmt  = Math.floor(subtotal * disc / 100)
+      const gstAmt   = Math.round((subtotal - discAmt) * gstRate / 100)
+      return { ...order, items: activeItems, subtotal, discount_amount: discAmt, gst_amount: gstAmt, total_amount: subtotal - discAmt + gstAmt }
+    },
+    onSuccess: (order) => {
+      setPayModal(false)
+      setReceiptModal(order)
+      setDiscountPercent('')
+      qc.removeQueries({ queryKey: ['tableOrder', selectedTable] })
+      qc.invalidateQueries({ queryKey: ['activeTables'] })
+      setSelectedTable(null)
+      setCart([])
+      toast.success(`Table ${selectedTable} billed successfully`)
+    },
+    onError: (e) => toast.error(e?.response?.data?.detail || 'Payment failed'),
   })
 
   function addToCart(item) {
@@ -278,6 +312,12 @@ export default function CashierTables() {
                   <span className="text-text">{formatINR(cartTotal)}</span>
                 </div>
               )}
+              {activeTableOrder && existingItems.filter(i => !i.cancelled_at).length > 0 && (
+                <div className="flex justify-between text-sm font-semibold px-1 text-green">
+                  <span>Order total</span>
+                  <span>{formatINR(existingItems.filter(i => !i.cancelled_at).reduce((s, i) => s + i.price * i.quantity, 0))}</span>
+                </div>
+              )}
               <button
                 onClick={() => sendMut.mutate()}
                 disabled={cart.length === 0 || sendMut.isPending}
@@ -291,6 +331,15 @@ export default function CashierTables() {
                 <ChefHat size={16} />
                 {sendMut.isPending ? 'Sending…' : 'Send to Kitchen'}
               </button>
+              {activeTableOrder && existingItems.filter(i => !i.cancelled_at).length > 0 && (
+                <button
+                  onClick={() => setPayModal(true)}
+                  className="w-full py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 bg-orange text-white hover:bg-orange/90 transition-all"
+                >
+                  <Receipt size={16} />
+                  Collect Payment & Bill
+                </button>
+              )}
             </div>
           </div>
 
@@ -369,6 +418,72 @@ export default function CashierTables() {
           </div>
         </div>
       )}
+
+      {/* Payment Modal */}
+      <Modal open={payModal} onClose={() => setPayModal(false)} title="Collect Payment">
+        {activeTableOrder && (() => {
+          const gstRate  = profile?.gst_rate ?? 5
+          const disc     = parseFloat(discountPercent) || 0
+          const activeItems = existingItems.filter(i => !i.cancelled_at)
+          const subtotal = activeItems.reduce((s, i) => s + i.price * i.quantity, 0)
+          const discAmt  = Math.floor(subtotal * disc / 100)
+          const taxable  = subtotal - discAmt
+          const gstAmt   = Math.round(taxable * gstRate / 100)
+          const total    = taxable + gstAmt
+          return (
+            <div className="space-y-4">
+              <div className="bg-bg2 rounded-xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between text-text2"><span>Table {selectedTable}</span><span>{activeItems.length} item(s)</span></div>
+                <div className="flex justify-between text-text2"><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
+                {discAmt > 0 && <div className="flex justify-between text-orange"><span>Discount ({disc}%)</span><span>-{formatINR(discAmt)}</span></div>}
+                <div className="flex justify-between text-text2"><span>GST ({gstRate}%)</span><span>{formatINR(gstAmt)}</span></div>
+                <div className="flex justify-between font-bold text-text text-base pt-1 border-t border-border">
+                  <span>Total</span><span>{formatINR(total)}</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text2 mb-1">Discount %</label>
+                <input
+                  type="number" min={0} max={100} value={discountPercent}
+                  onChange={e => setDiscountPercent(e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-bg border border-border2 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-green"
+                />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-text2 mb-2">Payment Method</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {['cash', 'upi', 'card'].map(m => (
+                    <button
+                      key={m}
+                      onClick={() => payMut.mutate(m)}
+                      disabled={payMut.isPending}
+                      className="py-3 rounded-xl border-2 border-border text-sm font-bold uppercase tracking-wide text-text2 hover:border-green hover:bg-green-dim hover:text-green transition-all disabled:opacity-50"
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+      </Modal>
+
+      {/* Receipt Modal */}
+      <Modal open={!!receiptModal} onClose={() => setReceiptModal(null)} title="Receipt">
+        {receiptModal && (
+          <div>
+            <ReceiptView order={receiptModal} profile={profile} />
+            <button
+              onClick={() => { printReceipt(receiptModal, profile); setReceiptModal(null) }}
+              className="mt-4 w-full py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 bg-green text-white hover:bg-green/90 transition-all"
+            >
+              <Printer size={16} /> Print Receipt
+            </button>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

@@ -18,7 +18,7 @@ function ExpiryBanner() {
   const daysLeft  = Math.round((expiryUTC - todayUTC) / (1000 * 60 * 60 * 24))
   if (daysLeft > 30) return null
 
-  const isCritical = daysLeft <= 1
+  const isCritical = daysLeft <= 0
   const isWarning  = daysLeft <= 7
 
   const style = isCritical
@@ -27,8 +27,10 @@ function ExpiryBanner() {
     ? 'bg-amber-dim text-amber border-amber/20'
     : 'bg-blue-dim text-blue border-blue/20'
 
-  const msg = isCritical
-    ? (daysLeft < 0 ? 'Your trial has expired.' : 'Your trial expires today!')
+  const msg = daysLeft < 0
+    ? 'Your trial has expired.'
+    : daysLeft === 0
+    ? 'Your trial expires today!'
     : `Your trial expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.`
 
   return (
