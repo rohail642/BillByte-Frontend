@@ -1,10 +1,11 @@
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { Outlet } from 'react-router-dom'
-import { Clock } from 'lucide-react'
-import { useEffect } from 'react'
+import { Clock, Megaphone, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../store/auth'
 import client from '../../api/client'
+import { getAnnouncements } from '../../api/announcements'
 
 function ExpiryBanner() {
   const { trialEndsAt, user } = useAuthStore()
@@ -37,8 +38,45 @@ function ExpiryBanner() {
     <div className={`flex items-center gap-2 px-5 py-2 text-xs font-semibold border-b ${style}`}>
       <Clock size={13} />
       {msg}
-      <span className="font-normal opacity-70 ml-0.5">Contact BillBite support to upgrade your plan.</span>
+      <span className="font-normal opacity-70 ml-0.5">Contact BillByte support to upgrade your plan.</span>
     </div>
+  )
+}
+
+function AnnouncementsBanner() {
+  const [announcements, setAnnouncements] = useState([])
+  const [dismissed, setDismissed] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('dismissed_announcements') || '[]') } catch { return [] }
+  })
+
+  useEffect(() => {
+    getAnnouncements().then(setAnnouncements).catch(() => {})
+  }, [])
+
+  const visible = announcements.filter(a => !dismissed.includes(a.id))
+  if (!visible.length) return null
+
+  function dismiss(id) {
+    const next = [...dismissed, id]
+    setDismissed(next)
+    sessionStorage.setItem('dismissed_announcements', JSON.stringify(next))
+  }
+
+  return (
+    <>
+      {visible.map(a => (
+        <div key={a.id} className="flex items-start gap-2.5 px-5 py-2.5 text-xs border-b bg-amber-dim text-amber border-amber/20">
+          <Megaphone size={13} className="mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="font-semibold">{a.title}</span>
+            {a.body && <span className="font-normal opacity-80 ml-1.5">{a.body}</span>}
+          </div>
+          <button onClick={() => dismiss(a.id)} className="shrink-0 opacity-50 hover:opacity-100 transition-opacity">
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+    </>
   )
 }
 
@@ -61,6 +99,7 @@ export default function AppLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar />
         <ExpiryBanner />
+        <AnnouncementsBanner />
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-5">
           <Outlet />
         </main>

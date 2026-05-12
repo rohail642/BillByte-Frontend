@@ -18,7 +18,7 @@ export default function Login() {
   const loginMut = useMutation({
     mutationFn: () => login({ email: form.email, password: form.password }),
     onSuccess: (data) => { setAuth(data); toast.success(`Welcome back, ${data.name}!`); navigate('/') },
-    onError:   (e)    => toast.error(String(e)),
+    onError:   (e)    => toast.error(typeof e === 'string' ? e : e?.message || 'Login failed'),
   })
 
   return (
@@ -47,6 +47,11 @@ export default function Login() {
               <Input label="Password" type="password" placeholder="••••••••" autoComplete="current-password"
                 value={form.password || ''} onChange={e => set('password', e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && loginMut.mutate()} />
+              {loginMut.isError && (
+                <p className="text-red text-xs font-medium text-center -mt-1">
+                  {typeof loginMut.error === 'string' ? loginMut.error : loginMut.error?.message || 'Login failed'}
+                </p>
+              )}
               <Button variant="primary" size="lg" className="w-full mt-1"
                 loading={loginMut.isPending} onClick={() => loginMut.mutate()}>
                 Sign In →

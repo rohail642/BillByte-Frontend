@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-export const API_URL = 'http://localhost:8000/api'
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 const client = axios.create({ baseURL: API_URL })
 
@@ -20,7 +20,7 @@ client.interceptors.request.use(cfg => {
 client.interceptors.response.use(
   res => res.data,
   err => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && !err.config?.url?.includes('/auth/login')) {
       localStorage.removeItem('bb_auth')
       window.location.href = '/login'
     }
