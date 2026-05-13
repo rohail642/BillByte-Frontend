@@ -302,7 +302,7 @@ export default function POSTerminal() {
                 {cart.orderType === 'dine_in' && (
                   <Select value={cart.tableNumber} onChange={e => cart.setTableNumber(e.target.value)}>
                     <option value="">Table *</option>
-                    {Array.from({length:16},(_,i) => <option key={i} value={String(i+1)}>Table {i+1}</option>)}
+                    {Array.from({length: profile?.table_count ?? 16},(_,i) => <option key={i} value={String(i+1)}>Table {i+1}</option>)}
                   </Select>
                 )}
               </div>
