@@ -433,11 +433,10 @@ export default function CashierTables() {
               )}
             </div>
           </div>
+          </div>
         </div>
       )}
 
-          </div>
-        </div>
       {/* Payment Modal */}
       <Modal open={payModal} onClose={() => setPayModal(false)} title="Collect Payment">
         {activeTableOrder && (() => {
