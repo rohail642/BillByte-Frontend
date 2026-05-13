@@ -27,6 +27,7 @@ export default function CashierTables() {
   const [cart, setCart] = useState([])
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
+  const [mobileTab, setMobileTab] = useState('menu')
   const [payModal, setPayModal] = useState(false)
   const [receiptModal, setReceiptModal] = useState(null)
   const [discountPercent, setDiscountPercent] = useState('')
@@ -230,9 +231,25 @@ export default function CashierTables() {
         </div>
       ) : (
         /* Split panel: order summary + menu */
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Mobile tab bar */}
+          <div className="flex md:hidden flex-shrink-0 bg-surface border-b border-border p-1 gap-1">
+            <button onClick={() => setMobileTab('menu')}
+              className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all',
+                mobileTab === 'menu' ? 'bg-green text-white' : 'text-text2')}>
+              🍽️ Menu
+            </button>
+            <button onClick={() => setMobileTab('order')}
+              className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all',
+                mobileTab === 'order' ? 'bg-green text-white' : 'text-text2')}>
+              🧾 Order {cart.length > 0 && (
+                <span className="ml-1 bg-red text-white text-[9px] rounded-full w-4 h-4 inline-flex items-center justify-center">{cart.length}</span>
+              )}
+            </button>
+          </div>
+          <div className="flex-1 flex md:flex-row overflow-hidden">
           {/* Left — Order Summary */}
-          <div className="w-72 lg:w-80 flex-shrink-0 border-r border-border flex flex-col bg-bg2">
+          <div className={clsx('w-full md:w-72 lg:w-80 flex-shrink-0 border-r border-border flex-col bg-bg2', mobileTab === 'order' ? 'flex' : 'hidden md:flex')}>
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
               <h2 className="font-bold text-text flex-1">Table {selectedTable}</h2>
               <button onClick={() => { qc.removeQueries({ queryKey: ['tableOrder', selectedTable] }); setSelectedTable(null); setCart([]) }} className="text-muted hover:text-text p-1 rounded">
@@ -344,7 +361,7 @@ export default function CashierTables() {
           </div>
 
           {/* Right — Menu */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className={clsx('flex-1 flex-col overflow-hidden', mobileTab === 'menu' ? 'flex' : 'hidden md:flex')}>
             <div className="px-4 py-3 border-b border-border space-y-2 flex-shrink-0">
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -419,6 +436,8 @@ export default function CashierTables() {
         </div>
       )}
 
+          </div>
+        </div>
       {/* Payment Modal */}
       <Modal open={payModal} onClose={() => setPayModal(false)} title="Collect Payment">
         {activeTableOrder && (() => {
