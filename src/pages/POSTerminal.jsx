@@ -293,6 +293,10 @@ export default function POSTerminal() {
                 </h3>
                 <button onClick={() => cart.clearCart()} className="text-xs text-muted hover:text-red transition-colors">Clear</button>
               </div>
+              <Select value={cart.orderType} onChange={e => cart.setOrderType(e.target.value)}>
+                <option value="takeaway">Takeaway</option>
+                <option value="delivery">Delivery</option>
+              </Select>
               <div className="relative">
                 <input
                   className={`w-full bg-bg border rounded-lg px-3 py-1.5 text-sm outline-none transition-all placeholder:text-muted ${
