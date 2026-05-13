@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMenuItems, getCategories, createMenuItem, updateMenuItem, deleteMenuItem } from '../api/menu'
+import { getMenuItems, getCategories, createMenuItem, updateMenuItem, deleteMenuItem, createCategory, deleteCategory } from '../api/menu'
 import { getInventory } from '../api/inventory'
 import { getRecipes, saveRecipe, deleteRecipe } from '../api/recipes'
 import toast from 'react-hot-toast'
@@ -12,7 +12,7 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
-import { Plus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = [
@@ -27,6 +27,8 @@ export default function Menu() {
   const [catFilter,    setCatFilter]   = useState('')
   const [itemModal,    setItemModal]   = useState(null)
   const [recipeModal,  setRecipeModal] = useState(null) // menu item object
+  const [catModal,     setCatModal]    = useState(false)
+  const [newCatName,   setNewCatName]  = useState('')
   const [form,         setForm]        = useState({})
   const [ingredients,  setIngredients] = useState([]) // [{inventory_item_id, quantity, unit}]
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -48,6 +50,17 @@ export default function Menu() {
     onSuccess: () => { toast.success('Recipe saved! Inventory will auto-deduct on KOT.'); refetchRecipes(); setRecipeModal(null) },
     onError: e => toast.error(String(e))
   })
+  const createCatMut = useMutation({
+    mutationFn: createCategory,
+    onSuccess: () => { toast.success('Category created!'); qc.invalidateQueries({ queryKey: ['categories'] }); setNewCatName('') },
+    onError: e => toast.error(String(e))
+  })
+  const deleteCatMut = useMutation({
+    mutationFn: deleteCategory,
+    onSuccess: () => { toast.success('Category deleted'); qc.invalidateQueries({ queryKey: ['categories'] }) },
+    onError: e => toast.error(String(e))
+  })
+
   const deleteRecipeMut = useMutation({
     mutationFn: deleteRecipe,
     onSuccess: () => { toast.success('Recipe removed.'); refetchRecipes() },
@@ -124,11 +137,17 @@ export default function Menu() {
           <div className="flex flex-wrap items-center gap-3">
             <input className="flex-1 min-w-48 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
               placeholder="🔍 Search menu..." value={search} onChange={e => setSearch(e.target.value)} />
-            <select className="bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-green cursor-pointer"
-              value={catFilter} onChange={e => setCatFilter(e.target.value)}>
-              <option value="">All Categories</option>
-              {(categories||[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <div className="flex items-center gap-1">
+              <select className="bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-green cursor-pointer"
+                value={catFilter} onChange={e => setCatFilter(e.target.value)}>
+                <option value="">All Categories</option>
+                {(categories||[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button onClick={() => setCatModal(true)} title="Manage categories"
+                className="p-2 rounded-lg border border-border bg-surface text-muted hover:text-text hover:bg-surface2 transition-colors">
+                <Tags size={15}/>
+              </button>
+            </div>
             <Button variant="primary" size="sm" icon={<Plus size={14}/>} onClick={openAddItem}>Add Item</Button>
           </div>
 
@@ -158,9 +177,11 @@ export default function Menu() {
                         <td className="py-3 px-2 text-text3">{catName(item.category_id)}</td>
                         <td className="py-3 px-2 font-bold text-green2">₹{item.price}</td>
                         <td className="py-3 px-2">
-                          <Badge color={item.food_type==='veg'?'green':item.food_type==='vegan'?'blue':'orange'}>
-                            {item.food_type.replace('_','-')}
-                          </Badge>
+                          {item.food_type !== 'na' && (
+                            <Badge color={item.food_type==='veg'?'green':item.food_type==='vegan'?'blue':'orange'}>
+                              {item.food_type.replace('_','-')}
+                            </Badge>
+                          )}
                         </td>
                         <td className="py-3 px-2">
                           {recipeMap[item.id] ? (
@@ -258,6 +279,41 @@ export default function Menu() {
         </div>
       )}
 
+      {/* ── MANAGE CATEGORIES MODAL ─────────────────────────────────── */}
+      <Modal open={catModal} onClose={() => { setCatModal(false); setNewCatName('') }} title="🏷️ Manage Categories">
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <input
+              className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
+              placeholder="New category name…"
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && newCatName.trim()) createCatMut.mutate({ name: newCatName.trim() }) }}
+            />
+            <Button variant="primary" size="sm" icon={<Plus size={14}/>}
+              loading={createCatMut.isPending}
+              onClick={() => { if (newCatName.trim()) createCatMut.mutate({ name: newCatName.trim() }) }}>
+              Add
+            </Button>
+          </div>
+          {(categories||[]).length === 0 ? (
+            <p className="text-sm text-muted text-center py-4">No categories yet. Add one above.</p>
+          ) : (
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {(categories||[]).map(c => (
+                <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface2">
+                  <span className="text-sm font-medium text-text">{c.name}</span>
+                  <button onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCatMut.mutate(c.id) }}
+                    className="p-1 rounded hover:bg-red-dim text-muted hover:text-red transition-colors">
+                    <Trash2 size={13}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
       {/* ── ADD/EDIT ITEM MODAL ──────────────────────────────────────── */}
       <Modal open={!!itemModal} onClose={() => setItemModal(null)}
         title={itemModal === 'add' ? '✚ Add Menu Item' : '✏️ Edit Item'}
@@ -283,6 +339,7 @@ export default function Menu() {
               <option value="veg">Veg</option>
               <option value="non_veg">Non-Veg</option>
               <option value="vegan">Vegan</option>
+              <option value="na">N/A</option>
             </Select>
           </div>
           <Select label="Category" value={form.category_id||''} onChange={e=>set('category_id',Number(e.target.value)||null)}>
