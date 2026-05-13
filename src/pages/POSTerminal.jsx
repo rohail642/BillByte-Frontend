@@ -293,19 +293,11 @@ export default function POSTerminal() {
                 </h3>
                 <button onClick={() => cart.clearCart()} className="text-xs text-muted hover:text-red transition-colors">Clear</button>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={cart.orderType} onChange={e => { cart.setOrderType(e.target.value); cart.setTableNumber('') }}>
-                  <option value="dine_in">Dine-in</option>
-                  <option value="takeaway">Takeaway</option>
-                  <option value="delivery">Delivery</option>
-                </Select>
-                {cart.orderType === 'dine_in' && (
-                  <Select value={cart.tableNumber} onChange={e => cart.setTableNumber(e.target.value)}>
-                    <option value="">Table *</option>
-                    {Array.from({length: profile?.table_count ?? 16},(_,i) => <option key={i} value={String(i+1)}>Table {i+1}</option>)}
-                  </Select>
-                )}
-              </div>
+              <Select value={cart.orderType} onChange={e => { cart.setOrderType(e.target.value); cart.setTableNumber('') }}>
+                <option value="dine_in">Dine-in</option>
+                <option value="takeaway">Takeaway</option>
+                <option value="delivery">Delivery</option>
+              </Select>
               <div className="relative">
                 <input
                   className={`w-full bg-bg border rounded-lg px-3 py-1.5 text-sm outline-none transition-all placeholder:text-muted ${

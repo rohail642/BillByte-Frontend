@@ -310,12 +310,6 @@ export default function Billing() {
               <option value="takeaway">Takeaway</option>
               <option value="delivery">Delivery</option>
             </Select>
-            {cart.orderType === 'dine_in' && (
-              <Select value={cart.tableNumber} onChange={e => cart.setTableNumber(e.target.value)}>
-                <option value="">Table *</option>
-                {Array.from({length: profile?.table_count ?? 16},(_,i) => <option key={i} value={String(i+1)}>Table {i+1}</option>)}
-              </Select>
-            )}
           </div>
           <div className="relative">
             <input
