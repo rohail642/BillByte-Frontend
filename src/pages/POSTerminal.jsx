@@ -34,6 +34,7 @@ export default function POSTerminal() {
   const [pointsApplied, setPointsApplied] = useState(false)
   const [activeTableView, setActiveTableView] = useState(false)
   const [selectedTable, setSelectedTable]     = useState(null)
+  const [mobileTab, setMobileTab]             = useState('menu')
   const cart     = useCartStore()
   const qc       = useQueryClient()
   const navigate = useNavigate()
@@ -152,7 +153,23 @@ export default function POSTerminal() {
   })
 
   return (
-    <div className="h-full flex gap-4 overflow-hidden">
+    <div className="h-full flex flex-col md:flex-row gap-4 overflow-hidden">
+
+          {/* Mobile tab bar */}
+          <div className="flex md:hidden flex-shrink-0 bg-surface border border-border rounded-xl p-1 gap-1">
+            <button onClick={() => setMobileTab('menu')}
+              className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all',
+                mobileTab === 'menu' ? 'bg-green text-white' : 'text-text2')}>
+              🍽️ Menu
+            </button>
+            <button onClick={() => setMobileTab('bill')}
+              className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all relative',
+                mobileTab === 'bill' ? 'bg-green text-white' : 'text-text2')}>
+              🧾 Bill {cart.items.length > 0 && (
+                <span className="ml-1 bg-red text-white text-[9px] rounded-full w-4 h-4 inline-flex items-center justify-center">{cart.items.length}</span>
+              )}
+            </button>
+          </div>
 
           {/* ACTIVE TABLES SIDEBAR */}
           {activeTableView && (
@@ -211,7 +228,7 @@ export default function POSTerminal() {
           )}
 
           {/* LEFT: Menu */}
-          <div className="flex-1 flex flex-col gap-3 overflow-hidden min-w-0">
+          <div className={clsx('flex-1 flex-col gap-3 overflow-hidden min-w-0', mobileTab === 'menu' ? 'flex' : 'hidden md:flex')}>
             <Card className="flex-shrink-0">
               <div className="flex gap-2">
                 <input
@@ -266,7 +283,7 @@ export default function POSTerminal() {
           </div>
 
           {/* RIGHT: Bill */}
-          <div className="w-72 xl:w-80 flex-shrink-0 flex flex-col gap-3 overflow-hidden">
+          <div className={clsx('w-full md:w-72 xl:w-80 flex-shrink-0 flex-col gap-3 overflow-hidden', mobileTab === 'bill' ? 'flex' : 'hidden md:flex')}>
             {/* Order meta */}
             <Card className="flex-shrink-0 space-y-2.5">
               <div className="flex items-center justify-between">
