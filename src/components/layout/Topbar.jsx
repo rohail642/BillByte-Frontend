@@ -101,7 +101,7 @@ export default function Topbar() {
   const totalCount = notifications.length
 
   return (
-    <header className="bg-bg2 border-b border-border flex items-center justify-between px-4 flex-shrink-0" style={{ minHeight: 60, paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="h-[60px] bg-bg2 border-b border-border flex items-center justify-between px-4 flex-shrink-0">
       <div className="flex items-center gap-3">
         <button onClick={toggleSidebar}
           className="lg:hidden p-2 rounded-lg text-text3 hover:text-text hover:bg-surface2 transition-colors">
