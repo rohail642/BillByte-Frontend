@@ -135,7 +135,7 @@ export default function Menu() {
       {tab === 'items' && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <input className="flex-1 min-w-48 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
+            <input className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
               placeholder="🔍 Search menu..." value={search} onChange={e => setSearch(e.target.value)} />
             <div className="flex items-center gap-1">
               <select className="bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-green cursor-pointer"

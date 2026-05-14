@@ -75,7 +75,7 @@ export default function Sidebar() {
         'w-56 bg-bg2 border-r border-border flex flex-col flex-shrink-0',
         'transition-transform duration-300 lg:translate-x-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
+      )} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 h-[60px] border-b border-border flex-shrink-0">
           <div className="font-display font-black text-xl text-text2 tracking-tight">

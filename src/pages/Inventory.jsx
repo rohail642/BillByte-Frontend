@@ -107,7 +107,7 @@ export default function Inventory() {
       {tab === 'Stock' && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-3 items-center">
-            <input className="flex-1 min-w-48 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
+            <input className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
               placeholder="🔍 Search stock..." value={search} onChange={e => setSearch(e.target.value)} />
             <Button variant="secondary" size="sm" icon={<RefreshCw size={13}/>} onClick={refetchAll}>Refresh</Button>
             <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openAdd}>Add Item</Button>
@@ -245,6 +245,7 @@ export default function Inventory() {
           {(usageSummary || []).length === 0
             ? <EmptyState icon="📊" title="No usage data yet" description="Usage is tracked automatically when stock is deducted" />
             : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-border">
                   {['Date','Item','Quantity Used'].map(h => (
@@ -261,6 +262,7 @@ export default function Inventory() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
         </Card>
       )}

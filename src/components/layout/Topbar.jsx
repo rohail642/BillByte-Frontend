@@ -101,7 +101,7 @@ export default function Topbar() {
   const totalCount = notifications.length
 
   return (
-    <header className="h-[60px] bg-bg2 border-b border-border flex items-center justify-between px-4 flex-shrink-0">
+    <header className="bg-bg2 border-b border-border flex items-center justify-between px-4 flex-shrink-0" style={{ minHeight: 60, paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex items-center gap-3">
         <button onClick={toggleSidebar}
           className="lg:hidden p-2 rounded-lg text-text3 hover:text-text hover:bg-surface2 transition-colors">
@@ -136,7 +136,7 @@ export default function Topbar() {
 
           {/* Dropdown */}
           {open && (
-            <div className="absolute right-0 top-full mt-2 w-72 bg-surface border border-border rounded-2xl shadow-lg z-50 overflow-hidden animate-fadeUp">
+            <div className="absolute right-0 top-full mt-2 w-[90vw] sm:w-72 max-w-sm bg-surface border border-border rounded-2xl shadow-lg z-50 overflow-hidden animate-fadeUp">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <p className="font-display font-bold text-sm text-text">Notifications</p>
                 {totalCount > 0 && (

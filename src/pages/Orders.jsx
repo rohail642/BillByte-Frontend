@@ -183,6 +183,7 @@ export default function Orders() {
               {/* Expanded detail */}
               {expandedId === order.id && (
                 <div className="mt-3 pt-3 border-t border-border">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-muted">
@@ -203,6 +204,7 @@ export default function Orders() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                   <div className="flex justify-between items-end mt-3 pt-2 border-t border-border flex-wrap gap-2">
                     <div className="text-xs text-muted space-y-0.5">
                       <div>GST: {formatINR(order.gst_amount)}</div>

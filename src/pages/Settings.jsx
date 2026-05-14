@@ -194,12 +194,12 @@ export default function Settings() {
               <p className="text-xs font-semibold text-amber">Restaurant name, owner name, address and city can only be changed by the BillByte admin.</p>
             </div>
             <Input label="Restaurant Name" value={form.restaurant_name || ''} disabled />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input label="Owner Name" value={form.name || ''} disabled />
               <Input label="Phone" value={form.phone || ''} onChange={e => set('phone', e.target.value)} placeholder="+91 98765 43210" />
             </div>
             <Input label="Address" value={form.address || ''} disabled />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input label="City" value={form.city || ''} disabled />
               <Input label="FSSAI No." value={form.fssai || ''} onChange={e => set('fssai', e.target.value)} placeholder="Enter FSSAI number" />
             </div>
@@ -366,7 +366,7 @@ export default function Settings() {
         {isLoading ? <div className="flex justify-center py-12"><Spinner size="lg" /></div> : (
           <Card className="space-y-3">
             <Input label="GSTIN" value={form.gstin || ''} onChange={e => set('gstin', e.target.value)} placeholder="29AABCT1332L1ZN" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input label="GST Rate %" type="number" value={form.gst_rate ?? 5} onChange={e => set('gst_rate', Number(e.target.value))} />
               <Input label="Takeaway GST %" type="number" defaultValue="5" />
             </div>
@@ -611,19 +611,22 @@ export default function Settings() {
   }
 
   return (
-    <div className="flex gap-4 h-full overflow-hidden">
-      <Card className="w-44 flex-shrink-0 self-start space-y-1 p-2">
+    <div className="flex flex-col md:flex-row gap-4 h-full overflow-y-auto md:overflow-hidden">
+      <Card className="w-full md:w-44 flex-shrink-0 md:self-start space-y-1 p-2">
+        <div className="flex flex-wrap md:flex-col gap-1">
         {SECTIONS.map(s => (
           <button key={s.id} onClick={() => setActive(s.id)}
             className={clsx(
-              'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left',
+              'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left',
+              'md:w-full',
               active === s.id ? 'bg-green-dim text-green2 font-semibold' : 'text-text2 hover:bg-surface2 hover:text-text'
             )}>
             <s.icon size={14} />{s.label}
           </button>
         ))}
+        </div>
       </Card>
-      <div className="flex-1 overflow-y-auto">{content[active]}</div>
+      <div className="flex-1 md:overflow-y-auto pb-8">{content[active]}</div>
     </div>
   )
 }
