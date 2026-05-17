@@ -29,7 +29,7 @@ export default function WaiterView() {
   const [activeCategory, setActiveCategory] = useState('all')
   const [mobileTab, setMobileTab] = useState('menu')
 
-  const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: getProfile })
+  const { data: profile, isLoading: profileLoading } = useQuery({ queryKey: ['profile'], queryFn: getProfile })
   const tableCount = profile?.table_count ?? 10
 
   const { data: activeTables = [] } = useQuery({
@@ -146,7 +146,7 @@ export default function WaiterView() {
           </div>
           <span className="text-sm font-medium text-text hidden sm:block">{user?.name}</span>
           <button
-            onClick={() => { clearAuth(); window.location.href = '/login' }}
+            onClick={() => { clearAuth(); window.location.hash = '/login' }}
             className="text-muted hover:text-red transition-colors p-1.5 rounded ml-1"
             title="Logout"
           >
@@ -159,8 +159,13 @@ export default function WaiterView() {
       {!selectedTable ? (
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           <h1 className="text-lg font-bold text-text mb-4">Select a Table</h1>
-
-          {sections.length > 0 ? (
+          {profileLoading ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="aspect-square rounded-xl bg-surface2 animate-pulse" />
+              ))}
+            </div>
+          ) : sections.length > 0 ? (
             <div className="space-y-6">
               {sections.map(section => {
                 const color = SECTION_COLORS[section.color] || '#78716c'
