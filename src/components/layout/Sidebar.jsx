@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getAlerts } from '../../api/inventory'
 import {
   Receipt, ShoppingBag, UtensilsCrossed, Package,
-  Users, ChefHat, BarChart2, Settings, LogOut, ClipboardList, Bike, LayoutDashboard
+  Users, ChefHat, BarChart2, Settings, LogOut, ClipboardList, Bike, LayoutDashboard, HeadphonesIcon
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -127,6 +127,23 @@ export default function Sidebar() {
           ))}
 
         </nav>
+
+        {/* Support */}
+        <div className="px-3 pb-2">
+          <div className="rounded-lg bg-surface2 px-3 py-2.5 space-y-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted flex items-center gap-1.5">
+              <HeadphonesIcon size={10} /> Support
+            </p>
+            <a href="mailto:rohail230@gmail.com" className="flex items-center gap-1.5 text-[11px] text-text2 hover:text-green transition-colors truncate">
+              rohail230@gmail.com
+            </a>
+            <div className="flex gap-2 text-[11px]">
+              <a href="https://wa.me/917892718642" target="_blank" rel="noreferrer" className="text-text2 hover:text-green transition-colors">+91 78927 18642</a>
+              <span className="text-muted">·</span>
+              <a href="https://wa.me/919986180523" target="_blank" rel="noreferrer" className="text-text2 hover:text-green transition-colors">+91 99861 80523</a>
+            </div>
+          </div>
+        </div>
 
         {/* User */}
         <div className="border-t border-border p-3">
