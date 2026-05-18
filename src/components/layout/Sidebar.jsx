@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getAlerts } from '../../api/inventory'
 import {
   Receipt, ShoppingBag, UtensilsCrossed, Package,
-  Users, ChefHat, BarChart2, Settings, LogOut, ClipboardList, Bike, LayoutDashboard, HeadphonesIcon
+  Users, ChefHat, BarChart2, Settings, LogOut, ClipboardList, Bike, LayoutDashboard, Headphones, Mail, Phone
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -130,18 +130,22 @@ export default function Sidebar() {
 
         {/* Support */}
         <div className="px-3 pb-2">
-          <div className="rounded-lg bg-surface2 px-3 py-2.5 space-y-1.5">
+          <div className="rounded-lg bg-surface2 px-3 py-2.5 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted flex items-center gap-1.5">
-              <HeadphonesIcon size={10} /> Support
+              <Headphones size={10} /> Support
             </p>
-            <a href="mailto:rohail230@gmail.com" className="flex items-center gap-1.5 text-[11px] text-text2 hover:text-green transition-colors truncate">
-              rohail230@gmail.com
+            <a href="mailto:rohail230@gmail.com" className="flex items-center gap-2 text-[11px] text-text2 hover:text-green transition-colors group">
+              <Mail size={11} className="text-muted group-hover:text-green flex-shrink-0" />
+              <span className="truncate">rohail230@gmail.com</span>
             </a>
-            <div className="flex gap-2 text-[11px]">
-              <a href="https://wa.me/917892718642" target="_blank" rel="noreferrer" className="text-text2 hover:text-green transition-colors">+91 78927 18642</a>
-              <span className="text-muted">·</span>
-              <a href="https://wa.me/919986180523" target="_blank" rel="noreferrer" className="text-text2 hover:text-green transition-colors">+91 99861 80523</a>
-            </div>
+            <a href="https://wa.me/917892718642" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[11px] text-text2 hover:text-green transition-colors group">
+              <Phone size={11} className="text-muted group-hover:text-green flex-shrink-0" />
+              <span>+91 78927 18642</span>
+            </a>
+            <a href="https://wa.me/919986180523" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[11px] text-text2 hover:text-green transition-colors group">
+              <Phone size={11} className="text-muted group-hover:text-green flex-shrink-0" />
+              <span>+91 99861 80523</span>
+            </a>
           </div>
         </div>
 
