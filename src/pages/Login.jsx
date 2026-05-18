@@ -61,6 +61,7 @@ export default function Login() {
         </div>
 
         <div className="mt-4 flex flex-col items-center gap-1 text-xs text-muted">
+          <p className="font-medium mb-1">Powered by BillByte Restaurant OS</p>
           <p>Need help?</p>
           <a href="mailto:rohail230@gmail.com" className="text-green hover:underline">rohail230@gmail.com</a>
           <div className="flex gap-3">
