@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus, removeOrderItem, collectPayment } from '../api/orders'
 import { getMenuItems, getCategories } from '../api/menu'
 import { getProfile } from '../api/auth'
+import { lookupCustomer } from '../api/customers'
 import toast from 'react-hot-toast'
 import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -31,6 +32,25 @@ export default function CashierTables() {
   const [payModal, setPayModal] = useState(false)
   const [receiptModal, setReceiptModal] = useState(null)
   const [discountPercent, setDiscountPercent] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [foundCustomer, setFoundCustomer] = useState(null)
+  const [lookingUp, setLookingUp] = useState(false)
+  const [notFound, setNotFound] = useState(false)
+  const [pointsApplied, setPointsApplied] = useState(false)
+
+  useEffect(() => {
+    if (!customerPhone || customerPhone.length < 10) { setFoundCustomer(null); setNotFound(false); return }
+    const timer = setTimeout(async () => {
+      try {
+        setLookingUp(true)
+        const res = await lookupCustomer(customerPhone)
+        setFoundCustomer(res || null)
+        setNotFound(!res)
+      } catch { setFoundCustomer(null); setNotFound(false) }
+      finally { setLookingUp(false) }
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [customerPhone])
 
   const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: getProfile })
   const tableCount = profile?.table_count ?? 10
@@ -113,9 +133,16 @@ export default function CashierTables() {
     mutationFn: async (payMethod) => {
       const gstRate = profile?.gst_rate ?? 5
       const disc = parseFloat(discountPercent) || 0
+      const activeItems = (activeTableOrder.items || []).filter(i => !i.cancelled_at)
+      const subtotal = activeItems.reduce((s, i) => s + i.price * i.quantity, 0)
+      const ptsToRedeem = (pointsApplied && foundCustomer?.id)
+        ? Math.min(foundCustomer.loyalty_points, Math.floor(subtotal * 10))
+        : 0
       const order = await collectPayment(activeTableOrder.id, {
         payment_method: payMethod,
         discount_percent: disc,
+        points_to_redeem: ptsToRedeem,
+        customer_id: foundCustomer?.id || null,
       })
       order.payment_method = payMethod
       // compute totals for receipt
@@ -129,6 +156,10 @@ export default function CashierTables() {
       setPayModal(false)
       setReceiptModal(order)
       setDiscountPercent('')
+      setCustomerPhone('')
+      setFoundCustomer(null)
+      setNotFound(false)
+      setPointsApplied(false)
       qc.removeQueries({ queryKey: ['tableOrder', selectedTable] })
       qc.invalidateQueries({ queryKey: ['activeTables'] })
       setSelectedTable(null)
@@ -438,7 +469,7 @@ export default function CashierTables() {
       )}
 
       {/* Payment Modal */}
-      <Modal open={payModal} onClose={() => setPayModal(false)} title="Collect Payment">
+      <Modal open={payModal} onClose={() => { setPayModal(false); setCustomerPhone(''); setFoundCustomer(null); setNotFound(false); setPointsApplied(false); setDiscountPercent('') }} title="Collect Payment">
         {activeTableOrder && (() => {
           const gstRate  = profile?.gst_rate ?? 5
           const disc     = parseFloat(discountPercent) || 0
@@ -450,24 +481,72 @@ export default function CashierTables() {
           const total    = taxable + gstAmt
           return (
             <div className="space-y-4">
+              {/* Customer phone lookup */}
+              <div>
+                <label className="block text-xs font-semibold text-text2 mb-1">Customer Phone (for loyalty)</label>
+                <input
+                  type="tel" placeholder="Enter phone number"
+                  value={customerPhone}
+                  onChange={e => { setCustomerPhone(e.target.value); setFoundCustomer(null); setNotFound(false); if (pointsApplied) { setPointsApplied(false); setDiscountPercent('') } }}
+                  className={`w-full bg-bg border rounded-lg px-3 py-2 text-sm text-text focus:outline-none transition-all ${foundCustomer ? 'border-green' : 'border-border2 focus:border-green'}`}
+                />
+                {lookingUp && <p className="text-[10px] text-muted mt-1 animate-pulse">Looking up customer...</p>}
+                {notFound && !lookingUp && customerPhone.length >= 10 && (
+                  <p className="text-[10px] text-orange mt-1 font-semibold">No customer found — points won't be tracked</p>
+                )}
+                {foundCustomer && (
+                  <div className="mt-2 bg-green-dim border border-green/20 rounded-lg px-3 py-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-green">{foundCustomer.name}</p>
+                      <p className="text-[10px] text-green/70">{foundCustomer.loyalty_points} pts = ₹{Math.floor(foundCustomer.loyalty_points / 10)} off</p>
+                    </div>
+                    {foundCustomer.loyalty_points >= 100 && (
+                      pointsApplied ? (
+                        <button
+                          onClick={() => { setPointsApplied(false); setDiscountPercent('') }}
+                          className="text-[10px] bg-red text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90">
+                          Remove
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            const ptsToUse = Math.min(foundCustomer.loyalty_points, Math.floor(subtotal * 10))
+                            const discRupees = Math.floor(ptsToUse / 10)
+                            const discPct = Math.floor((discRupees / subtotal) * 100)
+                            setDiscountPercent(String(discPct))
+                            setPointsApplied(true)
+                            toast.success(`${ptsToUse} points applied = ₹${discRupees} off!`)
+                          }}
+                          className="text-[10px] bg-green text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90">
+                          Apply Points
+                        </button>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="bg-bg2 rounded-xl p-4 space-y-2 text-sm">
                 <div className="flex justify-between text-text2"><span>Table {selectedTable}</span><span>{activeItems.length} item(s)</span></div>
                 <div className="flex justify-between text-text2"><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
-                {discAmt > 0 && <div className="flex justify-between text-orange"><span>Discount ({disc}%)</span><span>-{formatINR(discAmt)}</span></div>}
+                {discAmt > 0 && <div className="flex justify-between text-orange"><span>Discount ({disc}%){pointsApplied ? ' — Points' : ''}</span><span>-{formatINR(discAmt)}</span></div>}
                 <div className="flex justify-between text-text2"><span>GST ({gstRate}%)</span><span>{formatINR(gstAmt)}</span></div>
                 <div className="flex justify-between font-bold text-text text-base pt-1 border-t border-border">
                   <span>Total</span><span>{formatINR(total)}</span>
                 </div>
               </div>
+
               <div>
                 <label className="block text-xs font-semibold text-text2 mb-1">Discount %</label>
                 <input
                   type="number" min={0} max={100} value={discountPercent}
-                  onChange={e => setDiscountPercent(e.target.value)}
+                  onChange={e => !pointsApplied && setDiscountPercent(e.target.value)}
+                  readOnly={pointsApplied}
                   placeholder="0"
-                  className="w-full bg-bg border border-border2 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-green"
+                  className={`w-full bg-bg border rounded-lg px-3 py-2 text-sm text-text focus:outline-none transition-all ${pointsApplied ? 'border-green bg-green-dim text-green cursor-not-allowed' : 'border-border2 focus:border-green'}`}
                 />
               </div>
+
               <div>
                 <p className="text-xs font-semibold text-text2 mb-2">Payment Method</p>
                 <div className="grid grid-cols-3 gap-2">
