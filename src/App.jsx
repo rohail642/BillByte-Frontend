@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from './store/auth'
 import AppLayout from './components/layout/AppLayout'
 import Login from './pages/Login'
@@ -17,6 +17,25 @@ import WaiterView from './pages/WaiterView'
 import CashierTables from './pages/CashierTables'
 import POSTerminal from './pages/POSTerminal'
 import KitchenDisplay from './pages/KitchenDisplay'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
+
+function OfflineBanner() {
+  const [offline, setOffline] = useState(!navigator.onLine)
+  useEffect(() => {
+    const on  = () => setOffline(false)
+    const off = () => setOffline(true)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
+  if (!offline) return null
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-red text-white text-xs font-semibold text-center py-2 px-4">
+      No internet connection — changes will not be saved until you reconnect
+    </div>
+  )
+}
 
 function useRole() {
   return useAuthStore(s => s.user?.role) || 'owner'
@@ -82,9 +101,12 @@ function HomeRedirect() {
 export default function App() {
   return (
     <HashRouter>
+      <OfflineBanner />
       <ImpersonateHandler />
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
 
         {/* Waiter — full-screen, no sidebar */}
         <Route path="/waiter" element={
