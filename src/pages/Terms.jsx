@@ -69,7 +69,7 @@ export default function Terms() {
 
           <div>
             <h2 className="text-base font-semibold text-text mb-2">13. Contact</h2>
-            <p>For any questions about these Terms, contact us at <a href="mailto:rohail230@gmail.com" className="text-green underline">rohail230@gmail.com</a>.</p>
+            <p>For any questions about these Terms, contact us at <a href="mailto:rohail230@gmail.com" className="text-green underline">rohail230@gmail.com</a> or WhatsApp <a href="https://wa.me/917892718642" target="_blank" rel="noreferrer" className="text-green underline">+91 78927 18642</a> / <a href="https://wa.me/919986180523" target="_blank" rel="noreferrer" className="text-green underline">+91 99861 80523</a>.</p>
           </div>
 
         </section>

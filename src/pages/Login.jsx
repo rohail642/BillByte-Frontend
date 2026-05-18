@@ -64,6 +64,10 @@ export default function Login() {
           <p className="text-xs text-muted">
             Need help?{' '}
             <a href="mailto:rohail230@gmail.com" className="text-green hover:underline">rohail230@gmail.com</a>
+            <span className="mx-1.5 opacity-40">·</span>
+            <a href="https://wa.me/917892718642" target="_blank" rel="noreferrer" className="text-green hover:underline">+91 78927 18642</a>
+            <span className="mx-1.5 opacity-40">·</span>
+            <a href="https://wa.me/919986180523" target="_blank" rel="noreferrer" className="text-green hover:underline">+91 99861 80523</a>
           </p>
           <div className="flex gap-3 text-xs text-muted">
             <a href="#/terms" className="hover:text-text transition-colors">Terms of Service</a>
