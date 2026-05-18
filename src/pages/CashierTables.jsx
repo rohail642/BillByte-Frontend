@@ -133,10 +133,10 @@ export default function CashierTables() {
     mutationFn: async (payMethod) => {
       const gstRate = profile?.gst_rate ?? 5
       const disc = parseFloat(discountPercent) || 0
-      const activeItems = (activeTableOrder.items || []).filter(i => !i.cancelled_at)
-      const subtotal = activeItems.reduce((s, i) => s + i.price * i.quantity, 0)
+      const payItems = (activeTableOrder.items || []).filter(i => !i.cancelled_at)
+      const paySubtotal = payItems.reduce((s, i) => s + i.price * i.quantity, 0)
       const ptsToRedeem = (pointsApplied && foundCustomer?.id)
-        ? Math.min(foundCustomer.loyalty_points, Math.floor(subtotal * 10))
+        ? Math.min(foundCustomer.loyalty_points, Math.floor(paySubtotal * 10))
         : 0
       const order = await collectPayment(activeTableOrder.id, {
         payment_method: payMethod,
