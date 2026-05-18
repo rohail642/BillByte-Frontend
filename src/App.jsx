@@ -20,6 +20,16 @@ import KitchenDisplay from './pages/KitchenDisplay'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 
+function HydrationGate({ children }) {
+  const [hydrated, setHydrated] = useState(useAuthStore.persist.hasHydrated())
+  useEffect(() => {
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+    return unsub
+  }, [])
+  if (!hydrated) return <div className="min-h-screen bg-bg" />
+  return children
+}
+
 function OfflineBanner() {
   const [offline, setOffline] = useState(!navigator.onLine)
   useEffect(() => {
@@ -102,6 +112,7 @@ export default function App() {
   return (
     <HashRouter>
       <OfflineBanner />
+      <HydrationGate>
       <ImpersonateHandler />
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
@@ -167,6 +178,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </HydrationGate>
     </HashRouter>
   )
 }

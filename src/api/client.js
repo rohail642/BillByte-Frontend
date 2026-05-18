@@ -20,9 +20,9 @@ client.interceptors.request.use(cfg => {
 client.interceptors.response.use(
   res => res.data,
   err => {
-    if (err.response?.status === 401 && !err.config?.url?.includes('/auth/login')) {
+    if (err.response?.status === 401 && !err.config?.url?.includes('/auth/login') && err.config?.headers?.Authorization) {
       localStorage.removeItem('bb_auth')
-      window.location.href = '/login'
+      window.location.hash = '/login'
     }
     const detail = err.response?.data?.detail
     const message = Array.isArray(detail)
