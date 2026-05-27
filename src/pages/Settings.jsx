@@ -513,7 +513,7 @@ export default function Settings() {
       const meta      = PLAN_META[plan] || PLAN_META.trial
       const daysLeft  = profile?.days_left ?? null
       const expiresAt = profile?.trial_ends_at
-        ? new Date(profile.trial_ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+        ? new Date(profile.trial_ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
         : null
 
       let urgencyColor = 'text-green2'
