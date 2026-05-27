@@ -12,7 +12,7 @@ import Modal from '../components/ui/Modal'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
-import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck } from 'lucide-react'
+import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const SECTION_COLORS = [
@@ -37,10 +37,43 @@ const SECTIONS = [
 ]
 
 const PLAN_META = {
-  trial:      { label: 'Trial',      color: 'amber'  },
-  starter:    { label: 'Starter',    color: 'blue'   },
-  pro:        { label: 'Pro',        color: 'green'  },
-  enterprise: { label: 'Enterprise', color: 'purple' },
+  trial:   { label: 'Trial',   color: 'amber'  },
+  starter: { label: 'Starter', color: 'blue'   },
+  pro:     { label: 'Pro',     color: 'green'  },
+  custom:  { label: 'Custom',  color: 'purple' },
+}
+
+const PLAN_FEATURES = {
+  trial: [
+    'Billing & KOT',
+    'Table management',
+    'Dine-in, takeaway & delivery orders',
+    'Online orders (Zomato & Swiggy)',
+    'Basic reports',
+    'Staff roles (Owner, Cashier)',
+    'Works on any device — phone, tablet, or laptop',
+  ],
+  starter: [
+    'Billing & KOT',
+    'Table management',
+    'Dine-in, takeaway & delivery orders',
+    'Online orders (Zomato & Swiggy)',
+    'Basic reports',
+    'Staff roles (Owner, Cashier)',
+    'Works on any device — phone, tablet, or laptop',
+  ],
+  pro: [
+    'Everything in Starter',
+    'Inventory management & stock alerts',
+    'CRM & customer loyalty points',
+    'Staff roles (Owner, Cashier, Waiter, Kitchen)',
+    'Kitchen Display System',
+    'Advanced reports & CSV exports',
+    'Windows desktop app',
+    'PWA — works on any mobile device',
+    'Waiter app — table-side ordering & live KOT',
+  ],
+  custom: null,
 }
 
 export default function Settings() {
@@ -577,6 +610,21 @@ export default function Settings() {
                   </div>
                 )}
               </Card>
+
+              {/* What's included */}
+              {PLAN_FEATURES[plan] && (
+                <Card className="space-y-3">
+                  <p className="text-xs font-semibold text-muted uppercase tracking-wide">What's included</p>
+                  <ul className="space-y-2">
+                    {PLAN_FEATURES[plan].map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-text">
+                        <Check size={14} className="text-green2 mt-0.5 shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
 
               {/* Contact to upgrade */}
               <Card className="space-y-3">
