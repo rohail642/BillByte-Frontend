@@ -161,34 +161,34 @@ export default function App() {
           <Route index element={<HomeRedirect />} />
 
           <Route path="pos" element={
-            <RoleRoute allowed={['cashier', 'owner', 'manager']}><POSTerminal /></RoleRoute>
+            <RoleRoute allowed={['cashier', 'owner']}><POSTerminal /></RoleRoute>
           } />
           <Route path="billing" element={
-            <RoleRoute allowed={['cashier', 'manager']}><Billing /></RoleRoute>
+            <RoleRoute allowed={['cashier']}><Billing /></RoleRoute>
           } />
           <Route path="tables" element={
-            <RoleRoute allowed={['cashier', 'manager']}><CashierTables /></RoleRoute>
+            <RoleRoute allowed={['cashier']}><CashierTables /></RoleRoute>
           } />
           <Route path="orders" element={
-            <RoleRoute allowed={['owner', 'cashier', 'manager']}><Orders /></RoleRoute>
+            <RoleRoute allowed={['owner', 'cashier']}><Orders /></RoleRoute>
           } />
           <Route path="online-orders" element={
-            <RoleRoute allowed={['owner', 'cashier', 'manager']}><OnlineOrders /></RoleRoute>
+            <RoleRoute allowed={['owner', 'cashier']}><OnlineOrders /></RoleRoute>
           } />
           <Route path="menu" element={
-            <RoleRoute allowed={['owner', 'manager']}><Menu /></RoleRoute>
+            <RoleRoute allowed={['owner']}><Menu /></RoleRoute>
           } />
           <Route path="inventory" element={
-            <RoleRoute allowed={['owner', 'cashier', 'manager']}><Inventory /></RoleRoute>
+            <RoleRoute allowed={['owner', 'cashier']}><Inventory /></RoleRoute>
           } />
           <Route path="crm" element={
-            <RoleRoute allowed={['owner', 'cashier', 'manager']}><CRM /></RoleRoute>
+            <RoleRoute allowed={['owner', 'cashier']}><CRM /></RoleRoute>
           } />
           <Route path="staff" element={
-            <RoleRoute allowed={['owner', 'manager']}><Staff /></RoleRoute>
+            <RoleRoute allowed={['owner']}><Staff /></RoleRoute>
           } />
           <Route path="reports" element={
-            <RoleRoute allowed={['owner', 'manager']}><Reports /></RoleRoute>
+            <RoleRoute allowed={['owner']}><Reports /></RoleRoute>
           } />
           <Route path="settings" element={
             <RoleRoute allowed={['owner']}><Settings /></RoleRoute>
