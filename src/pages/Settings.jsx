@@ -724,10 +724,10 @@ export default function Settings() {
             <Input label="Full Name" placeholder="e.g. Ramesh Kumar" value={teamForm.name||''} onChange={e=>setTF('name',e.target.value)} />
             <Input label="Email" type="email" placeholder="ramesh@restaurant.com" value={teamForm.email||''} onChange={e=>setTF('email',e.target.value)} />
             <Input label="Password" type="password" placeholder="Set a login password" value={teamForm.password||''} onChange={e=>setTF('password',e.target.value)} />
-            <Select label="Role" value={teamForm.role||'waiter'} onChange={e=>setTF('role',e.target.value)}>
-              <option value="waiter">Waiter — Billing & Orders only</option>
+            <Select label="Role" value={teamForm.role||'cashier'} onChange={e=>setTF('role',e.target.value)}>
               <option value="cashier">Cashier — Billing, Orders & CRM</option>
-              <option value="kitchen">Kitchen — Kitchen Display only</option>
+              {['pro', 'custom'].includes(profile?.plan) && <option value="waiter">Waiter — Billing & Orders only</option>}
+              {['pro', 'custom'].includes(profile?.plan) && <option value="kitchen">Kitchen — Kitchen Display only</option>}
             </Select>
           </div>
         </Modal>
@@ -743,10 +743,10 @@ export default function Settings() {
           </>}>
           <div className="space-y-3">
             <Input label="Full Name" value={teamForm.name||''} onChange={e=>setTF('name',e.target.value)} />
-            <Select label="Role" value={teamForm.role||'waiter'} onChange={e=>setTF('role',e.target.value)}>
-              <option value="waiter">Waiter</option>
+            <Select label="Role" value={teamForm.role||'cashier'} onChange={e=>setTF('role',e.target.value)}>
               <option value="cashier">Cashier</option>
-              <option value="kitchen">Kitchen</option>
+              {['pro', 'custom'].includes(profile?.plan) && <option value="waiter">Waiter</option>}
+              {['pro', 'custom'].includes(profile?.plan) && <option value="kitchen">Kitchen</option>}
             </Select>
             <Input label="New Password (leave blank to keep)" type="password" placeholder="Optional"
               value={teamForm.password||''} onChange={e=>setTF('password',e.target.value)} />
