@@ -550,7 +550,7 @@ export default function Settings() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-muted font-semibold uppercase tracking-wide mb-1">
-                        {plan === 'trial' ? 'Trial Expires' : 'License Renews'}
+                        License Expiry
                       </p>
                       <p className="text-sm font-semibold text-text">{expiresAt}</p>
                     </div>
