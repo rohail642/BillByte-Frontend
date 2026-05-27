@@ -8,16 +8,18 @@ import client from '../../api/client'
 import { getAnnouncements } from '../../api/announcements'
 
 function ExpiryBanner() {
-  const { trialEndsAt, user } = useAuthStore()
+  const { trialEndsAt, plan, user } = useAuthStore()
   if (user?.role !== 'owner' || !trialEndsAt) return null
+  if (plan === 'custom') return null
 
   const expiry = new Date(trialEndsAt)
   const today  = new Date()
-  // Compare calendar dates in UTC to avoid timezone shifting
   const expiryUTC = Date.UTC(expiry.getUTCFullYear(), expiry.getUTCMonth(), expiry.getUTCDate())
   const todayUTC  = Date.UTC(today.getUTCFullYear(),  today.getUTCMonth(),  today.getUTCDate())
   const daysLeft  = Math.round((expiryUTC - todayUTC) / (1000 * 60 * 60 * 24))
-  if (daysLeft > 30) return null
+
+  // Pro: only show when ≤10 days left. Trial: always show.
+  if (plan === 'pro' && daysLeft > 10) return null
 
   const isCritical = daysLeft <= 0
   const isWarning  = daysLeft <= 7
@@ -28,11 +30,14 @@ function ExpiryBanner() {
     ? 'bg-amber-dim text-amber border-amber/20'
     : 'bg-blue-dim text-blue border-blue/20'
 
+  const isTrial = !plan || plan === 'trial'
   const msg = daysLeft < 0
-    ? 'Your trial has expired.'
+    ? (isTrial ? 'Your trial has expired.' : 'Your license has expired.')
     : daysLeft === 0
-    ? 'Your trial expires today!'
-    : `Your trial expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.`
+    ? (isTrial ? 'Your trial expires today!' : 'Your license expires today!')
+    : isTrial
+    ? `Your trial expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.`
+    : `Your license expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.`
 
   return (
     <div className={`flex items-center gap-2 px-5 py-2 text-xs font-semibold border-b ${style}`}>
@@ -87,9 +92,11 @@ export default function AppLayout() {
   useEffect(() => {
     if (!token) return
     client.get('/auth/profile').then((profile) => {
-      if (profile?.enabled_modules) {
-        useAuthStore.setState({ enabledModules: profile.enabled_modules })
-      }
+      const update = {}
+      if (profile?.enabled_modules) update.enabledModules = profile.enabled_modules
+      if (profile?.plan)            update.plan = profile.plan
+      if (profile?.trial_ends_at)   update.trialEndsAt = profile.trial_ends_at
+      if (Object.keys(update).length) useAuthStore.setState(update)
     }).catch(() => {})
   }, [token])
 

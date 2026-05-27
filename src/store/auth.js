@@ -18,7 +18,7 @@ export const useAuthStore = create(
         trialEndsAt: data.trial_ends_at || null,
         enabledModules: data.enabled_modules || null,
       }),
-      clearAuth: () => set({ token: null, user: null, restaurantId: null, restaurantName: null, trialEndsAt: null, enabledModules: null }),
+      clearAuth: () => set({ token: null, user: null, restaurantId: null, restaurantName: null, trialEndsAt: null, enabledModules: null, plan: null }),
     }),
     { name: 'bb_auth' }
   )
