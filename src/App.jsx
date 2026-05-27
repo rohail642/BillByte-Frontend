@@ -26,6 +26,25 @@ function HydrationGate({ children }) {
     const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
     return unsub
   }, [])
+
+  // Impersonate: admin passes ?impersonate=TOKEN in the URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('impersonate')
+    const restaurantId = params.get('restaurant_id')
+    const restaurantName = params.get('restaurant_name')
+    if (token) {
+      useAuthStore.setState({
+        token,
+        user: { id: 0, name: 'Admin (impersonating)', role: 'owner' },
+        restaurantId: restaurantId ? Number(restaurantId) : null,
+        restaurantName: restaurantName ? decodeURIComponent(restaurantName) : null,
+      })
+      // Clean URL without triggering a reload
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
   if (!hydrated) return <div className="min-h-screen bg-bg" />
   return children
 }
