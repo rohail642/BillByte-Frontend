@@ -1,7 +1,7 @@
 {
   "name": "billbyte-react",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.2",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -10,12 +10,14 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "vite build && electron-builder"
+    "electron:build": "vite build && electron-builder",
+    "electron:publish": "vite build && electron-builder --publish always"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",
     "axios": "^1.14.0",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.3",
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -41,7 +43,9 @@
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
     "vite": "^8.0.4",
-    "wait-on": "^8.0.3"
+    "vite-plugin-pwa": "^1.3.0",
+    "wait-on": "^8.0.3",
+    "workbox-window": "^7.4.1"
   },
   "build": {
     "appId": "com.billbyte.pos",
@@ -54,7 +58,8 @@
       "electron/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -62,6 +67,12 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "BillByte POS"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "rohail642",
+      "repo": "BillByte-Frontend",
+      "releaseType": "release"
     }
   }
 }
