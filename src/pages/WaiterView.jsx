@@ -5,7 +5,7 @@ import { getMenuItems, getCategories } from '../api/menu'
 import { getProfile } from '../api/auth'
 import { useAuthStore } from '../store/auth'
 import toast from 'react-hot-toast'
-import { LogOut, X, Plus, Minus, Search, ChefHat, UtensilsCrossed } from 'lucide-react'
+import { LogOut, X, Plus, Minus, Search, ChefHat, UtensilsCrossed, ArrowLeft } from 'lucide-react'
 
 const SECTION_COLORS = {
   blue:   '#3b82f6',
@@ -135,10 +135,28 @@ export default function WaiterView() {
     <div className="h-screen flex flex-col bg-bg overflow-hidden">
       {/* Header */}
       <div className="h-[60px] bg-bg2 border-b border-border flex items-center px-4 gap-3 flex-shrink-0">
-        <div className="font-display font-black text-xl text-green tracking-tight">
-          Bill<span className="text-orange">Byte</span>
-        </div>
-        <div className="text-xs text-muted font-medium ml-1">{restaurantName}</div>
+        {selectedTable ? (
+          <button
+            onClick={() => { setSelectedTable(null); setCart([]) }}
+            className="flex items-center gap-1.5 text-sm font-semibold text-text2 hover:text-green transition-colors"
+          >
+            <ArrowLeft size={18} />
+            <span>Tables</span>
+          </button>
+        ) : (
+          <>
+            <div className="font-display font-black text-xl text-green tracking-tight">
+              Bill<span className="text-orange">Byte</span>
+            </div>
+            <div className="text-xs text-muted font-medium ml-1">{restaurantName}</div>
+          </>
+        )}
+        {selectedTable && (
+          <div className="flex items-center gap-2 ml-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-border2" />
+            <span className="text-sm font-bold text-text">Table {selectedTable}</span>
+          </div>
+        )}
         <div className="flex-1" />
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-green text-white flex items-center justify-center text-[11px] font-bold">
@@ -223,10 +241,7 @@ export default function WaiterView() {
           {/* Left — Order Summary */}
           <div className={clsx('w-full md:w-72 lg:w-80 flex-shrink-0 border-r border-border flex-col bg-bg2', mobileTab === 'order' ? 'flex' : 'hidden md:flex')}>
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-              <h2 className="font-bold text-text flex-1">Table {selectedTable}</h2>
-              <button onClick={() => { setSelectedTable(null); setCart([]) }} className="text-muted hover:text-text p-1 rounded">
-                <X size={16} />
-              </button>
+              <h2 className="font-bold text-text flex-1">Order Summary</h2>
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-4">
