@@ -84,5 +84,5 @@ export function printKOT({ restaurantName, orderNumber, tableNumber, items = [],
   win.document.write(html)
   win.document.close()
   win.focus()
-  setTimeout(() => { win.print(); win.close() }, 300)
+  setTimeout(() => win.print(), 300)
 }
