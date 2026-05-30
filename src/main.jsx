@@ -14,18 +14,18 @@ registerSW({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span>Update available</span>
           <button
-            onClick={() => { updateSW(true); toast.dismiss(t.id) }}
+            onClick={() => { toast.dismiss(t.id); updateSW(true); setTimeout(() => window.location.reload(), 300) }}
             style={{
               background: '#16a34a', color: '#fff', border: 'none',
               borderRadius: 20, padding: '4px 12px', fontWeight: 700,
-              fontSize: 12, cursor: 'pointer',
+              fontSize: 12, cursor: 'pointer', flexShrink: 0,
             }}
           >
             Refresh
           </button>
         </div>
       ),
-      { duration: Infinity, id: 'sw-update' }
+      { duration: Infinity, id: 'sw-update', style: { borderRadius: '12px' } }
     )
   },
 })
