@@ -13,7 +13,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { Plus, Minus, Trash2, UtensilsCrossed, Send, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { formatINR } from '../utils'
+import { formatINR, printKOT } from '../utils'
 import { clsx } from 'clsx'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 
@@ -138,15 +138,13 @@ export default function POSTerminal() {
           ? `✅ Payment done — #${order.order_number}`
           : `📋 KOT sent — #${order.order_number}`
       )
-      if (window.electronAPI?.printKOT) {
-        window.electronAPI.printKOT({
-          restaurantName: profile?.restaurant_name || '',
-          orderNumber:    order.order_number,
-          tableNumber:    kotTable || order.table_number,
-          items:          kotItems || [],
-          notes:          order.notes || '',
-        })
-      }
+      printKOT({
+        restaurantName: profile?.restaurant_name || '',
+        orderNumber:    order.order_number,
+        tableNumber:    kotTable || order.table_number,
+        items:          kotItems || [],
+        notes:          order.notes || '',
+      })
       cart.clearCart()
       setFoundCustomer(null)
       setNotFound(false)

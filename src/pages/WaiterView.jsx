@@ -17,7 +17,7 @@ const SECTION_COLORS = {
   gray:   '#78716c',
 }
 import { clsx } from 'clsx'
-import { formatINR } from '../utils'
+import { formatINR, printKOT } from '../utils'
 
 export default function WaiterView() {
   const { user, restaurantName, clearAuth } = useAuthStore()
@@ -78,6 +78,12 @@ export default function WaiterView() {
     },
     onSuccess: () => {
       toast.success(`Order sent to kitchen — Table ${selectedTable}`)
+      printKOT({
+        restaurantName: profile?.restaurant_name || '',
+        tableNumber:    selectedTable,
+        items:          cart.map(i => ({ name: i.name, quantity: i.qty })),
+        notes:          '',
+      })
       setCart([])
       setSelectedTable(null)
       qc.invalidateQueries({ queryKey: ['activeTables'] })
