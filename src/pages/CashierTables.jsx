@@ -7,7 +7,8 @@ import { lookupCustomer } from '../api/customers'
 import toast from 'react-hot-toast'
 import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer } from 'lucide-react'
 import { clsx } from 'clsx'
-import { formatINR, printKOT } from '../utils'
+import { formatINR, printKOTElectron } from '../utils'
+import { KOTModal } from '../components/ui/KOTView'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 import Modal from '../components/ui/Modal'
 
@@ -31,6 +32,7 @@ export default function CashierTables() {
   const [mobileTab, setMobileTab] = useState('menu')
   const [payModal, setPayModal] = useState(false)
   const [receiptModal, setReceiptModal] = useState(null)
+  const [kotModal, setKotModal] = useState(null)
   const [discountPercent, setDiscountPercent] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [foundCustomer, setFoundCustomer] = useState(null)
@@ -117,12 +119,13 @@ export default function CashierTables() {
     },
     onSuccess: () => {
       toast.success(`Order sent to kitchen — Table ${selectedTable}`)
-      printKOT({
+      const kotData = {
         restaurantName: profile?.restaurant_name || '',
         tableNumber:    selectedTable,
         items:          cart.map(i => ({ name: i.name, quantity: i.qty })),
         notes:          '',
-      })
+      }
+      if (!printKOTElectron(kotData)) setKotModal(kotData)
       setCart([])
       qc.removeQueries({ queryKey: ['tableOrder', selectedTable] })
       qc.invalidateQueries({ queryKey: ['activeTables'] })
@@ -587,6 +590,8 @@ export default function CashierTables() {
           </div>
         )}
       </Modal>
+
+      <KOTModal data={kotModal} onClose={() => setKotModal(null)} />
     </div>
   )
 }

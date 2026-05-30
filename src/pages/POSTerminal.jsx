@@ -13,7 +13,8 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { Plus, Minus, Trash2, UtensilsCrossed, Send, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { formatINR, printKOT } from '../utils'
+import { formatINR, printKOTElectron } from '../utils'
+import { KOTModal } from '../components/ui/KOTView'
 import { clsx } from 'clsx'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 
@@ -25,6 +26,7 @@ export default function POSTerminal() {
   const [catFilter, setCatFilter]       = useState('')
   const [payModal, setPayModal]         = useState(false)
   const [receiptModal, setReceiptModal] = useState(null)
+  const [kotModal, setKotModal]         = useState(null)
   const [foundCustomer, setFoundCustomer] = useState(null)
   const [lookingUp, setLookingUp]       = useState(false)
   const [notFound, setNotFound]         = useState(false)
@@ -138,13 +140,14 @@ export default function POSTerminal() {
           ? `✅ Payment done — #${order.order_number}`
           : `📋 KOT sent — #${order.order_number}`
       )
-      printKOT({
+      const kotData = {
         restaurantName: profile?.restaurant_name || '',
         orderNumber:    order.order_number,
         tableNumber:    kotTable || order.table_number,
         items:          kotItems || [],
         notes:          order.notes || '',
-      })
+      }
+      if (!printKOTElectron(kotData)) setKotModal(kotData)
       cart.clearCart()
       setFoundCustomer(null)
       setNotFound(false)
@@ -519,6 +522,8 @@ export default function POSTerminal() {
               </div>
             )}
           </Modal>
+
+          <KOTModal data={kotModal} onClose={() => setKotModal(null)} />
 
     </div>
   )

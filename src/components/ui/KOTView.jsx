@@ -1,0 +1,120 @@
+import Modal from './Modal'
+import Button from './Button'
+import { Printer } from 'lucide-react'
+
+const Sep = () => (
+  <div style={{ borderTop: '1px dashed #555', margin: '6px 0' }} />
+)
+
+export default function KOTView({ data }) {
+  const { restaurantName, orderNumber, tableNumber, items = [], notes } = data
+
+  const now     = new Date()
+  const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
+
+  const s = {
+    wrap:   { fontFamily: "'Courier New', Courier, monospace", fontSize: 12, maxWidth: 310, margin: '0 auto', padding: '12px 14px', color: '#111', background: '#fff' },
+    center: { textAlign: 'center' },
+    bold:   { fontWeight: 700 },
+    muted:  { color: '#555' },
+    sm:     { fontSize: 11 },
+    row:    { display: 'flex', justifyContent: 'space-between', marginBottom: 2 },
+  }
+
+  return (
+    <div id="kot-print-area" style={s.wrap}>
+
+      {/* Header */}
+      <div style={{ ...s.center, marginBottom: 8 }}>
+        <div style={{ fontWeight: 900, fontSize: 20, letterSpacing: 3 }}>KOT</div>
+        <div style={{ fontWeight: 700, fontSize: 13, marginTop: 2 }}>
+          {restaurantName || 'Restaurant'}
+        </div>
+      </div>
+
+      <Sep />
+
+      {/* Meta */}
+      <div style={{ ...s.sm, marginBottom: 4 }}>
+        <div style={s.row}>
+          <span>{tableNumber ? `Table: ${tableNumber}` : 'Takeaway / Delivery'}</span>
+          {orderNumber && <span style={s.bold}>#{orderNumber}</span>}
+        </div>
+        <div style={{ ...s.muted }}>
+          {dateStr} &nbsp; {timeStr}
+        </div>
+      </div>
+
+      <Sep />
+
+      {/* Items */}
+      <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ ...s.bold, borderBottom: '1px solid #111' }}>
+            <th style={{ textAlign: 'center', paddingBottom: 4, width: 36 }}>QTY</th>
+            <th style={{ textAlign: 'left',   paddingBottom: 4 }}>ITEM</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, i) => (
+            <tr key={i} style={{ borderBottom: '1px dashed #ccc' }}>
+              <td style={{ textAlign: 'center', paddingTop: 5, paddingBottom: 5, fontWeight: 700, fontSize: 13 }}>
+                {item.quantity}
+              </td>
+              <td style={{ paddingTop: 5, paddingBottom: 5 }}>{item.name}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <Sep />
+
+      {notes?.trim() && (
+        <>
+          <div style={{ ...s.sm }}>
+            <span style={s.bold}>Notes: </span>{notes.trim()}
+          </div>
+          <Sep />
+        </>
+      )}
+
+    </div>
+  )
+}
+
+export function printKOTContent() {
+  const content = document.getElementById('kot-print-area')
+  if (!content) return
+  const win = window.open('', '_blank', 'width=380,height=600')
+  win.document.write(`<html><head><title>KOT</title>
+    <style>
+      body { margin: 0; padding: 16px; font-family: 'Courier New', Courier, monospace; }
+      @media print { body { margin: 0 } }
+    </style>
+    </head><body>${content.innerHTML}</body></html>`)
+  win.document.close()
+  win.focus()
+  setTimeout(() => win.print(), 300)
+}
+
+export function KOTModal({ data, onClose }) {
+  if (!data) return null
+  return (
+    <Modal
+      open={!!data}
+      onClose={onClose}
+      title="🍽️ KOT"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+          <Button variant="primary" icon={<Printer size={14} />} onClick={printKOTContent}>
+            Print KOT
+          </Button>
+        </>
+      }
+    >
+      <KOTView data={data} />
+    </Modal>
+  )
+}

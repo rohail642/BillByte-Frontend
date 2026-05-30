@@ -17,7 +17,8 @@ const SECTION_COLORS = {
   gray:   '#78716c',
 }
 import { clsx } from 'clsx'
-import { formatINR, printKOT } from '../utils'
+import { formatINR, printKOTElectron } from '../utils'
+import { KOTModal } from '../components/ui/KOTView'
 
 export default function WaiterView() {
   const { user, restaurantName, clearAuth } = useAuthStore()
@@ -25,6 +26,7 @@ export default function WaiterView() {
 
   const [selectedTable, setSelectedTable] = useState(null)
   const [cart, setCart] = useState([])
+  const [kotModal, setKotModal] = useState(null)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [mobileTab, setMobileTab] = useState('menu')
@@ -78,12 +80,13 @@ export default function WaiterView() {
     },
     onSuccess: () => {
       toast.success(`Order sent to kitchen — Table ${selectedTable}`)
-      printKOT({
+      const kotData = {
         restaurantName: profile?.restaurant_name || '',
         tableNumber:    selectedTable,
         items:          cart.map(i => ({ name: i.name, quantity: i.qty })),
         notes:          '',
-      })
+      }
+      if (!printKOTElectron(kotData)) setKotModal(kotData)
       setCart([])
       setSelectedTable(null)
       qc.invalidateQueries({ queryKey: ['activeTables'] })
@@ -398,6 +401,8 @@ export default function WaiterView() {
           </div>
         </div>
       )}
+
+      <KOTModal data={kotModal} onClose={() => setKotModal(null)} />
     </div>
   )
 }
