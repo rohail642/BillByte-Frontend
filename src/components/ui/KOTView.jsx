@@ -83,7 +83,7 @@ export default function KOTView({ data }) {
   )
 }
 
-export function printKOTContent() {
+export function printKOTContent(data) {
   const content = document.getElementById('kot-print-area')
   if (!content) return
   const win = window.open('', '_blank', 'width=380,height=600')
@@ -108,7 +108,7 @@ export function KOTModal({ data, onClose }) {
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Close</Button>
-          <Button variant="primary" icon={<Printer size={14} />} onClick={printKOTContent}>
+          <Button variant="primary" icon={<Printer size={14} />} onClick={() => { onClose(); setTimeout(() => printKOTContent(data), 100) }}>
             Print KOT
           </Button>
         </>
