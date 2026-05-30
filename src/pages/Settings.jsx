@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProfile, updateProfile } from '../api/auth'
 import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
@@ -12,7 +12,7 @@ import Modal from '../components/ui/Modal'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
-import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check } from 'lucide-react'
+import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check, Printer } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const SECTION_COLORS = [
@@ -32,6 +32,7 @@ const SECTIONS = [
   { id: 'integrations',  label: 'Integrations',  icon: Link2           },
   { id: 'notifications', label: 'Notifications', icon: Bell            },
   { id: 'gst',           label: 'GST / Tax',     icon: FileText        },
+  { id: 'printers',      label: 'KOT Printers',  icon: Printer         },
   { id: 'team',          label: 'Team Access',   icon: Users           },
   { id: 'license',       label: 'License',       icon: ShieldCheck     },
 ]
@@ -86,6 +87,29 @@ export default function Settings() {
     orderAlert: true, lowStock: true, dailySummary: true, showGst: true,
   })
   const toggle = k => setToggles(t => ({ ...t, [k]: !t[k] }))
+
+  const [printers, setPrinters] = useState([{ name: '', ip: '' }])
+  const [savingPrinters, setSavingPrinters] = useState(false)
+
+  useEffect(() => {
+    if (!window.electronAPI?.getPrinterConfig) return
+    window.electronAPI.getPrinterConfig().then(config => {
+      if (config?.printers?.length) setPrinters(config.printers)
+    })
+  }, [])
+
+  async function savePrinters() {
+    if (!window.electronAPI?.savePrinterConfig) return
+    setSavingPrinters(true)
+    try {
+      await window.electronAPI.savePrinterConfig({ printers })
+      toast.success('Printer settings saved!')
+    } catch {
+      toast.error('Failed to save printer settings')
+    } finally {
+      setSavingPrinters(false)
+    }
+  }
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile'],
@@ -645,6 +669,55 @@ export default function Settings() {
         </div>
       )
     })(),
+
+    printers: (
+      <div className="space-y-4">
+        <h3 className="font-display font-bold text-sm text-text">KOT Printers</h3>
+        {!window.electronAPI?.isElectron ? (
+          <Card>
+            <p className="text-sm text-muted text-center py-6">KOT printer configuration is only available in the desktop app.</p>
+          </Card>
+        ) : (
+          <>
+            <p className="text-xs text-muted">Add up to 3 WiFi thermal printers. Every KOT will be sent to all configured printers simultaneously.</p>
+            <div className="space-y-3">
+              {printers.map((printer, i) => (
+                <Card key={i} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-text">Printer {i + 1}</p>
+                    {printers.length > 1 && (
+                      <button onClick={() => setPrinters(p => p.filter((_, j) => j !== i))}
+                        className="p-1.5 rounded-lg hover:bg-red-dim text-muted hover:text-red transition-colors">
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input label="Printer Name" placeholder="e.g. Kitchen, Counter"
+                      value={printer.name}
+                      onChange={e => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, name: e.target.value } : pr))} />
+                    <Input label="IP Address" placeholder="e.g. 192.168.1.100"
+                      value={printer.ip}
+                      onChange={e => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, ip: e.target.value } : pr))} />
+                  </div>
+                </Card>
+              ))}
+            </div>
+            <div className="flex items-center justify-between">
+              {printers.length < 3 ? (
+                <Button variant="secondary" size="sm" icon={<Plus size={13} />}
+                  onClick={() => setPrinters(p => [...p, { name: '', ip: '' }])}>
+                  Add Printer
+                </Button>
+              ) : <div />}
+              <Button variant="primary" size="sm" loading={savingPrinters} onClick={savePrinters}>
+                Save Printers
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    ),
 
     team: (
       <div className="space-y-4">

@@ -125,14 +125,28 @@ export default function POSTerminal() {
         }
       }
 
-      return { order, showReceipt }
+      return {
+        order,
+        showReceipt,
+        kotItems: cart.items.map(i => ({ name: i.name, quantity: i.qty })),
+        kotTable: cart.tableNumber,
+      }
     },
-    onSuccess: ({ order, showReceipt }) => {
+    onSuccess: ({ order, showReceipt, kotItems, kotTable }) => {
       toast.success(
         order.payment_method
           ? `✅ Payment done — #${order.order_number}`
           : `📋 KOT sent — #${order.order_number}`
       )
+      if (window.electronAPI?.printKOT) {
+        window.electronAPI.printKOT({
+          restaurantName: profile?.restaurant_name || '',
+          orderNumber:    order.order_number,
+          tableNumber:    kotTable || order.table_number,
+          items:          kotItems || [],
+          notes:          order.notes || '',
+        })
+      }
       cart.clearCart()
       setFoundCustomer(null)
       setNotFound(false)

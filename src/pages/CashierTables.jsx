@@ -117,6 +117,14 @@ export default function CashierTables() {
     },
     onSuccess: () => {
       toast.success(`Order sent to kitchen — Table ${selectedTable}`)
+      if (window.electronAPI?.printKOT) {
+        window.electronAPI.printKOT({
+          restaurantName: profile?.restaurant_name || '',
+          tableNumber:    selectedTable,
+          items:          cart.map(i => ({ name: i.name, quantity: i.qty })),
+          notes:          '',
+        })
+      }
       setCart([])
       qc.removeQueries({ queryKey: ['tableOrder', selectedTable] })
       qc.invalidateQueries({ queryKey: ['activeTables'] })

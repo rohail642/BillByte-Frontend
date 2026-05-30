@@ -1,7 +1,11 @@
-const { contextBridge } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron')
 
-// Expose a safe flag so React can detect it's running inside Electron
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
-  platform: process.platform,
+  platform:   process.platform,
+
+  // KOT printing
+  printKOT:          (kotData) => ipcRenderer.send('print-kot', kotData),
+  getPrinterConfig:  ()        => ipcRenderer.invoke('get-printer-config'),
+  savePrinterConfig: (config)  => ipcRenderer.invoke('save-printer-config', config),
 })
