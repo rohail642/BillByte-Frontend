@@ -84,15 +84,53 @@ export default function KOTView({ data }) {
 }
 
 export function printKOTContent(data) {
-  const content = document.getElementById('kot-print-area')
-  if (!content) return
-  const win = window.open('', '_blank', 'width=380,height=600')
-  win.document.write(`<html><head><title>KOT</title>
+  const { restaurantName, orderNumber, tableNumber, items = [], notes } = data
+  const now     = new Date()
+  const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const tableLabel = tableNumber ? `Table: ${tableNumber}` : 'Takeaway / Delivery'
+  const orderLabel = orderNumber ? `<span style="font-weight:700">#${orderNumber}</span>` : ''
+  const SEP = `<div style="border-top:1px dashed #555;margin:6px 0"></div>`
+
+  const rows = items.map(i => `
+    <tr style="border-bottom:1px dashed #ccc">
+      <td style="text-align:center;padding:5px;font-weight:700;font-size:13px;width:36px">${i.quantity}</td>
+      <td style="padding:5px">${i.name}</td>
+    </tr>`).join('')
+
+  const notesHtml = notes?.trim()
+    ? `${SEP}<div style="font-size:11px"><b>Notes: </b>${notes.trim()}</div>`
+    : ''
+
+  const html = `<html><head><title>KOT</title>
     <style>
-      body { margin: 0; padding: 16px; font-family: 'Courier New', Courier, monospace; }
-      @media print { body { margin: 0 } }
-    </style>
-    </head><body>${content.innerHTML}</body></html>`)
+      body { margin:0; padding:16px; font-family:'Courier New',Courier,monospace; font-size:12px; max-width:310px; }
+      @media print { body { margin:0 } }
+    </style></head><body>
+    <div style="text-align:center;margin-bottom:8px">
+      <div style="font-weight:900;font-size:20px;letter-spacing:3px">KOT</div>
+      <div style="font-weight:700;font-size:13px;margin-top:2px">${restaurantName || ''}</div>
+    </div>
+    ${SEP}
+    <div style="font-size:11px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+        <span>${tableLabel}</span>${orderLabel}
+      </div>
+      <div style="color:#555">${dateStr} &nbsp; ${timeStr}</div>
+    </div>
+    ${SEP}
+    <table style="width:100%;font-size:11px;border-collapse:collapse">
+      <thead><tr style="font-weight:700;border-bottom:1px solid #111">
+        <th style="text-align:center;padding-bottom:4px;width:36px">QTY</th>
+        <th style="text-align:left;padding-bottom:4px">ITEM</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${SEP}${notesHtml}
+    </body></html>`
+
+  const win = window.open('', '_blank', 'width=380,height=600')
+  win.document.write(html)
   win.document.close()
   win.focus()
   setTimeout(() => win.print(), 300)
