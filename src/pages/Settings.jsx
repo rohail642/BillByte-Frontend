@@ -32,7 +32,7 @@ const SECTIONS = [
   { id: 'integrations',  label: 'Integrations',  icon: Link2           },
   { id: 'notifications', label: 'Notifications', icon: Bell            },
   { id: 'gst',           label: 'GST / Tax',     icon: FileText        },
-  { id: 'printers',      label: 'KOT Printers',  icon: Printer         },
+  { id: 'printers',      label: 'Printers',       icon: Printer         },
   { id: 'team',          label: 'Team Access',   icon: Users           },
   { id: 'license',       label: 'License',       icon: ShieldCheck     },
 ]
