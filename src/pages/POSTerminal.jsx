@@ -255,20 +255,6 @@ export default function POSTerminal() {
                   placeholder="🔍  Search menu..."
                   value={search} onChange={e => setSearch(e.target.value)}
                 />
-                <button
-                  onClick={() => { setActiveTableView(v => !v); setSelectedTable(null) }}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition-all ${
-                    activeTableView
-                      ? 'bg-green-dim border-green/30 text-green2'
-                      : 'bg-surface2 border-border text-text2 hover:border-green hover:text-green'
-                  }`}>
-                  🪑 Tables
-                  {(activeTables || []).length > 0 && (
-                    <span className="bg-red text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center">
-                      {(activeTables || []).length}
-                    </span>
-                  )}
-                </button>
               </div>
               <div className="flex gap-1.5 flex-wrap mt-3">
                 <button onClick={() => setCatFilter('')}
