@@ -5,7 +5,7 @@ import { getMenuItems, getCategories } from '../api/menu'
 import { getProfile } from '../api/auth'
 import { lookupCustomer } from '../api/customers'
 import toast from 'react-hot-toast'
-import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer } from 'lucide-react'
+import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer, ArrowLeft } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatINR, printKOTElectron } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
@@ -276,6 +276,19 @@ export default function CashierTables() {
       ) : (
         /* Split panel: order summary + menu */
         <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Mobile back header */}
+          <div className="flex md:hidden items-center gap-2 px-3 py-2 border-b border-border flex-shrink-0">
+            <button
+              onClick={() => { qc.removeQueries({ queryKey: ['tableOrder', selectedTable] }); setSelectedTable(null); setCart([]) }}
+              className="flex items-center gap-1.5 text-sm font-semibold text-text2 hover:text-green transition-colors"
+            >
+              <ArrowLeft size={18} />
+              <span>Tables</span>
+            </button>
+            <span className="text-muted">•</span>
+            <span className="text-sm font-semibold text-text">Table {selectedTable}</span>
+          </div>
+
           {/* Mobile tab bar */}
           <div className="flex md:hidden flex-shrink-0 bg-surface border-b border-border p-1 gap-1">
             <button onClick={() => setMobileTab('menu')}
