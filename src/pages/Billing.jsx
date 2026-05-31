@@ -153,7 +153,7 @@ export default function Billing() {
         items:          kotItems || [],
         notes:          order.notes || '',
       }
-      if (!printKOTElectron(kotData)) setKotModal(kotData)
+      const didElectronPrint = printKOTElectron(kotData)
       cart.clearCart()
       setFoundCustomer(null)
       setNotFound(false)
@@ -173,8 +173,11 @@ export default function Billing() {
           setReceiptModal(order)
         }
       } else if (!order.payment_method) {
-        // KOT sent — redirect to dashboard
-        navigate('/')
+        if (didElectronPrint) {
+          navigate('/')
+        } else {
+          setKotModal(kotData)
+        }
       }
     },
     onError: (e) => toast.error(String(e)),
@@ -532,7 +535,7 @@ export default function Billing() {
         )}
       </Modal>
 
-      <KOTModal data={kotModal} onClose={() => setKotModal(null)} />
+      <KOTModal data={kotModal} onClose={() => { setKotModal(null); navigate('/') }} />
     </div>
   )
 }
