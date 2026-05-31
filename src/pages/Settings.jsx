@@ -88,13 +88,15 @@ export default function Settings() {
   })
   const toggle = k => setToggles(t => ({ ...t, [k]: !t[k] }))
 
-  const [printers, setPrinters] = useState([{ name: '', ip: '' }])
+  const [printers, setPrinters]       = useState([{ name: '', ip: '' }])
+  const [billPrinter, setBillPrinter] = useState({ name: '', ip: '' })
   const [savingPrinters, setSavingPrinters] = useState(false)
 
   useEffect(() => {
     if (!window.electronAPI?.getPrinterConfig) return
     window.electronAPI.getPrinterConfig().then(config => {
       if (config?.printers?.length) setPrinters(config.printers)
+      if (config?.billPrinter)      setBillPrinter(config.billPrinter)
     })
   }, [])
 
@@ -102,7 +104,7 @@ export default function Settings() {
     if (!window.electronAPI?.savePrinterConfig) return
     setSavingPrinters(true)
     try {
-      await window.electronAPI.savePrinterConfig({ printers })
+      await window.electronAPI.savePrinterConfig({ printers, billPrinter })
       toast.success('Printer settings saved!')
     } catch {
       toast.error('Failed to save printer settings')
@@ -707,9 +709,25 @@ export default function Settings() {
               {printers.length < 3 ? (
                 <Button variant="secondary" size="sm" icon={<Plus size={13} />}
                   onClick={() => setPrinters(p => [...p, { name: '', ip: '' }])}>
-                  Add Printer
+                  Add KOT Printer
                 </Button>
               ) : <div />}
+            </div>
+
+            <h4 className="font-display font-bold text-sm text-text pt-2">Bill Printer</h4>
+            <p className="text-xs text-muted">The printer at the billing counter that prints customer receipts.</p>
+            <Card className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input label="Printer Name" placeholder="e.g. Billing Counter"
+                  value={billPrinter.name}
+                  onChange={e => setBillPrinter(p => ({ ...p, name: e.target.value }))} />
+                <Input label="IP Address" placeholder="e.g. 192.168.1.102"
+                  value={billPrinter.ip}
+                  onChange={e => setBillPrinter(p => ({ ...p, ip: e.target.value }))} />
+              </div>
+            </Card>
+
+            <div className="flex justify-end">
               <Button variant="primary" size="sm" loading={savingPrinters} onClick={savePrinters}>
                 Save Printers
               </Button>

@@ -160,7 +160,11 @@ export default function POSTerminal() {
       qc.invalidateQueries({ queryKey: ['alerts'] })
       qc.invalidateQueries({ queryKey: ['customers'] })
       if (showReceipt) {
-        setReceiptModal(order)
+        if (window.electronAPI?.printBill) {
+          window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate }, order })
+        } else {
+          setReceiptModal(order)
+        }
       }
       // KOT sent — stay on POS terminal (no redirect)
     },

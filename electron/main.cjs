@@ -89,6 +89,86 @@ function buildKOTBuffer(kotData) {
   return Buffer.concat(parts)
 }
 
+// ── ESC/POS bill builder ──────────────────────────────────────────────────────
+
+function buildBillBuffer(billData) {
+  const { restaurant: r = {}, order: o = {} } = billData
+  const ESC = 0x1b, GS = 0x1d
+
+  const init       = Buffer.from([ESC, 0x40])
+  const boldOn     = Buffer.from([ESC, 0x45, 0x01])
+  const boldOff    = Buffer.from([ESC, 0x45, 0x00])
+  const center     = Buffer.from([ESC, 0x61, 0x01])
+  const left       = Buffer.from([ESC, 0x61, 0x00])
+  const dblHeight  = Buffer.from([ESC, 0x21, 0x10])
+  const normalSize = Buffer.from([ESC, 0x21, 0x00])
+  const cut        = Buffer.from([GS,  0x56, 0x00])
+
+  const W    = 42
+  const LINE = Buffer.from('-'.repeat(W) + '\n')
+  const lpad = (s, n) => String(s).substring(0, n).padEnd(n)
+  const rpad = (s, n) => String(s).substring(0, n).padStart(n)
+
+  const orderTypeLabel = { dine_in: 'Dine-In', takeaway: 'Takeaway', delivery: 'Delivery', zomato: 'Zomato', swiggy: 'Swiggy' }[o.order_type] || ''
+  const payLabel       = { cash: 'Cash', upi: 'UPI', card: 'Card' }[o.payment_method] || o.payment_method || ''
+  const gstRate        = r.gst_rate ?? 5
+  const halfRate       = (gstRate / 2).toFixed(1)
+  const halfAmt        = ((o.gst_amount || 0) / 2).toFixed(2)
+
+  const dt      = o.created_at ? new Date(o.created_at) : new Date()
+  const dateStr = dt.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  const timeStr = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
+
+  const parts = [
+    init,
+    center, boldOn, dblHeight,
+    Buffer.from(`${r.name || 'Restaurant'}\n`),
+    normalSize, boldOff,
+  ]
+
+  if (r.phone)   parts.push(Buffer.from(`PH: ${r.phone}\n`))
+  if (r.address) parts.push(Buffer.from(`${r.address}\n`))
+  if (r.city)    parts.push(Buffer.from(`${r.city}\n`))
+  if (r.fssai)   parts.push(Buffer.from(`FSSAI: ${r.fssai}\n`))
+  if (r.gstin)   parts.push(Buffer.from(`GSTIN: ${r.gstin}\n`))
+
+  parts.push(LINE, left)
+  parts.push(Buffer.from(`Date: ${dateStr} ${timeStr}   ${orderTypeLabel}\n`))
+  parts.push(Buffer.from(`Bill: #${o.order_number}${o.table_number ? `   Table: ${o.table_number}` : ''}\n`))
+  if (payLabel) parts.push(Buffer.from(`Payment: ${payLabel}\n`))
+
+  parts.push(LINE, boldOn)
+  parts.push(Buffer.from(`${lpad('#', 3)}${lpad('Item', 21)}${rpad('Qty', 4)}${rpad('Rate', 8)}${rpad('Amt', 6)}\n`))
+  parts.push(boldOff, LINE)
+
+  const items = (o.items || []).filter(i => !i.cancelled_at)
+  items.forEach((item, idx) => {
+    const amt = (item.total || item.price * item.quantity)
+    parts.push(Buffer.from(
+      `${lpad(idx + 1, 3)}${lpad(item.name, 21)}${rpad(item.quantity, 4)}${rpad(Number(item.price).toFixed(2), 8)}${rpad(Number(amt).toFixed(2), 6)}\n`
+    ))
+  })
+
+  const totalQty = items.reduce((s, i) => s + i.quantity, 0)
+  const fmtRow   = (label, value) => Buffer.from(`${lpad(label, W - 10)}${rpad(value, 10)}\n`)
+
+  parts.push(LINE)
+  parts.push(fmtRow(`Total Qty: ${totalQty}`, `Sub: ${Number(o.subtotal || 0).toFixed(2)}`))
+  parts.push(fmtRow(`CGST (${halfRate}%)`, halfAmt))
+  parts.push(fmtRow(`SGST (${halfRate}%)`, halfAmt))
+  if (o.discount_amount > 0) parts.push(fmtRow('Discount', `-${Number(o.discount_amount).toFixed(2)}`))
+
+  parts.push(LINE, boldOn)
+  parts.push(fmtRow('Grand Total', `Rs.${Number(o.total_amount || 0).toFixed(2)}`))
+  parts.push(boldOff, LINE, center)
+  parts.push(Buffer.from('Thank You, Visit Again!\n'))
+  parts.push(Buffer.from('Powered by BillByte\n'))
+  parts.push(Buffer.from('\n\n\n'))
+  parts.push(cut)
+
+  return Buffer.concat(parts)
+}
+
 // ── TCP thermal print ─────────────────────────────────────────────────────────
 
 function printToThermal(ip, buffer) {
@@ -136,6 +216,17 @@ ipcMain.on('print-kot', (_, kotData) => {
       console.error(`KOT print failed — ${printer.name} (${printer.ip}): ${err.message}`)
     })
   }
+})
+
+ipcMain.on('print-bill', (_, billData) => {
+  const config      = readPrinterConfig()
+  const billPrinter = config.billPrinter
+  if (!billPrinter?.ip?.trim()) return
+
+  const buffer = buildBillBuffer(billData)
+  printToThermal(billPrinter.ip.trim(), buffer).catch(err => {
+    console.error(`Bill print failed — ${billPrinter.name} (${billPrinter.ip}): ${err.message}`)
+  })
 })
 
 // ── Window ────────────────────────────────────────────────────────────────────

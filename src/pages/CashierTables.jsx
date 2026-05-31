@@ -163,7 +163,11 @@ export default function CashierTables() {
     },
     onSuccess: (order) => {
       setPayModal(false)
-      setReceiptModal(order)
+      if (window.electronAPI?.printBill) {
+        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate }, order })
+      } else {
+        setReceiptModal(order)
+      }
       setDiscountPercent('')
       setCustomerPhone('')
       setFoundCustomer(null)
