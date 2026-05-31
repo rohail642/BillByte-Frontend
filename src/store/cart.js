@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 export const useCartStore = create((set, get) => ({
   items: [],
-  orderType: 'dine_in',
+  orderType: 'takeaway',
   tableNumber: '',
   customerName: '',
   discountPercent: 0,
