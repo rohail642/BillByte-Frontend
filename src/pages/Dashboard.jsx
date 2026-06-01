@@ -47,13 +47,13 @@ export default function Dashboard() {
   const [tableOrder,  setTableOrder]  = useState(null) // loaded order for that table
   const navigate = useNavigate()
 
-  const { data: summary }   = useQuery({ queryKey: ['summary'],   queryFn: getDashboardSummary, refetchInterval: 5000 })
-  const { data: trend }     = useQuery({ queryKey: ['trend', trendRange], queryFn: () => getRevenueTrend(TREND_DAYS[trendRange]) })
-  const { data: topDishes } = useQuery({ queryKey: ['topDishes'], queryFn: () => getTopDishes('today') })
-  const { data: liveOrders } = useQuery({ queryKey: ['orders', 'live'], queryFn: () => getOrders({ limit: 50 }), refetchInterval: 5000 })
-  const { data: inventory } = useQuery({ queryKey: ['inventory'], queryFn: () => getInventory({}) })
+  const { data: summary }    = useQuery({ queryKey: ['summary'],   queryFn: getDashboardSummary, refetchInterval: 15000 })
+  const { data: trend }      = useQuery({ queryKey: ['trend', trendRange], queryFn: () => getRevenueTrend(TREND_DAYS[trendRange]) })
+  const { data: topDishes }  = useQuery({ queryKey: ['topDishes'], queryFn: () => getTopDishes('today') })
+  const { data: liveOrders } = useQuery({ queryKey: ['orders', 'live'], queryFn: () => getOrders({ limit: 50 }), refetchInterval: 15000 })
+  const { data: inventory }  = useQuery({ queryKey: ['inventory'], queryFn: () => getInventory({}) })
 
-  const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 5000 })
+  const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 15000 })
 
   const loadTableOrder = (tableNum) => {
     const tableData = (activeTables || []).find(t => String(t.table_number) === String(tableNum))

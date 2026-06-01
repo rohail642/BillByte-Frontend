@@ -1,24 +1,25 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { useAuthStore } from './store/auth'
 import AppLayout from './components/layout/AppLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import Billing from './pages/Billing'
-import Orders from './pages/Orders'
-import OnlineOrders from './pages/OnlineOrders'
-import Menu from './pages/Menu'
-import Inventory from './pages/Inventory'
-import CRM from './pages/CRM'
-import Staff from './pages/Staff'
-import Reports from './pages/Reports'
-import Settings from './pages/Settings'
-import WaiterView from './pages/WaiterView'
-import CashierTables from './pages/CashierTables'
 import POSTerminal from './pages/POSTerminal'
+import Billing from './pages/Billing'
+import CashierTables from './pages/CashierTables'
+import WaiterView from './pages/WaiterView'
 import KitchenDisplay from './pages/KitchenDisplay'
-import Terms from './pages/Terms'
-import Privacy from './pages/Privacy'
+
+const Orders       = lazy(() => import('./pages/Orders'))
+const OnlineOrders = lazy(() => import('./pages/OnlineOrders'))
+const Menu         = lazy(() => import('./pages/Menu'))
+const Inventory    = lazy(() => import('./pages/Inventory'))
+const CRM          = lazy(() => import('./pages/CRM'))
+const Staff        = lazy(() => import('./pages/Staff'))
+const Reports      = lazy(() => import('./pages/Reports'))
+const Settings     = lazy(() => import('./pages/Settings'))
+const Terms        = lazy(() => import('./pages/Terms'))
+const Privacy      = lazy(() => import('./pages/Privacy'))
 
 function HydrationGate({ children }) {
   const [hydrated, setHydrated] = useState(useAuthStore.persist.hasHydrated())
@@ -133,6 +134,7 @@ export default function App() {
       <OfflineBanner />
       <HydrationGate>
       <ImpersonateHandler />
+      <Suspense fallback={<div className="min-h-screen bg-bg" />}>
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/terms" element={<Terms />} />
@@ -197,6 +199,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
       </HydrationGate>
     </HashRouter>
   )
