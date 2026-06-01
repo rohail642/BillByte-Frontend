@@ -88,6 +88,13 @@ function AnnouncementsBanner() {
 export default function AppLayout() {
   const { enabledModules, setAuth, token, user, restaurantId, restaurantName, phone, trialEndsAt } = useAuthStore()
 
+  // Forward auth token to Electron main process for KOT auto-print polling
+  useEffect(() => {
+    if (!window.electronAPI?.setAuthToken) return
+    if (token) window.electronAPI.setAuthToken(token, restaurantName)
+    else window.electronAPI.clearAuthToken()
+  }, [token, restaurantName])
+
   // Refresh modules from the server on every mount so admin changes take effect immediately
   useEffect(() => {
     if (!token) return

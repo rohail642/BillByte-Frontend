@@ -195,7 +195,105 @@ function printToThermal(ip, buffer) {
   })
 }
 
+// ── KOT auto-print polling ────────────────────────────────────────────────────
+
+const API_BASE = 'https://api.billbyte.co.in/api'
+let _authToken       = null
+let _restaurantName  = ''
+let _kotInitialized  = false
+let _pollingTimer    = null
+const _printedKots   = new Set()
+
+function _getMaxKotNum(items) {
+  const nums = (items || []).map(i => i.kot_number || 1)
+  return nums.length ? Math.max(...nums) : 1
+}
+
+async function _initPrintedKots() {
+  try {
+    const res = await fetch(`${API_BASE}/orders/?status=kot_sent&limit=100`, {
+      headers: { Authorization: `Bearer ${_authToken}` },
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    const orders = data.items || data || []
+    for (const order of orders) {
+      const maxKot = _getMaxKotNum(order.items || [])
+      _printedKots.add(`${order.id}-${maxKot}`)
+    }
+  } catch { /* fail open */ } finally {
+    _kotInitialized = true
+  }
+}
+
+async function _pollKOTs() {
+  if (!_authToken || !_kotInitialized) return
+  const config   = readPrinterConfig()
+  const printers = (config.printers || []).filter(p => p.ip?.trim())
+  if (!printers.length) return
+
+  try {
+    const res = await fetch(`${API_BASE}/orders/?status=kot_sent&limit=50`, {
+      headers: { Authorization: `Bearer ${_authToken}` },
+    })
+    if (!res.ok) return
+    const data   = await res.json()
+    const orders = data.items || data || []
+
+    for (const order of orders) {
+      const allItems = (order.items || []).filter(i => !i.cancelled_at)
+      if (!allItems.length) continue
+      const maxKot = _getMaxKotNum(allItems)
+      const key    = `${order.id}-${maxKot}`
+      if (_printedKots.has(key)) continue
+      _printedKots.add(key)
+
+      const kotItems = allItems
+        .filter(i => (i.kot_number || 1) === maxKot)
+        .map(i => ({ name: i.name, quantity: i.quantity }))
+
+      const buffer = buildKOTBuffer({
+        restaurantName: _restaurantName,
+        orderNumber:    order.order_number,
+        tableNumber:    order.table_number,
+        items:          kotItems,
+        notes:          order.notes || '',
+      })
+
+      for (const printer of printers) {
+        printToThermal(printer.ip.trim(), buffer).catch(err =>
+          console.error(`Auto KOT print failed — ${printer.name}: ${err.message}`)
+        )
+      }
+    }
+  } catch (err) {
+    console.error('KOT poll error:', err.message)
+  }
+}
+
+function _startPolling() {
+  if (_pollingTimer) clearInterval(_pollingTimer)
+  _kotInitialized = false
+  _printedKots.clear()
+  _initPrintedKots().then(() => {
+    _pollingTimer = setInterval(_pollKOTs, 5000)
+  })
+}
+
+function _stopPolling() {
+  if (_pollingTimer) { clearInterval(_pollingTimer); _pollingTimer = null }
+  _authToken = null; _restaurantName = ''; _kotInitialized = false; _printedKots.clear()
+}
+
 // ── IPC handlers ─────────────────────────────────────────────────────────────
+
+ipcMain.on('set-auth-token', (_, { token, name }) => {
+  _authToken      = token
+  _restaurantName = name || ''
+  _startPolling()
+})
+
+ipcMain.on('clear-auth-token', () => _stopPolling())
 
 ipcMain.handle('get-printer-config', () => readPrinterConfig())
 
