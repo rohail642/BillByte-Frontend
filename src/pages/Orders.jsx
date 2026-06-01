@@ -52,12 +52,18 @@ export default function Orders() {
 
   const payMut = useMutation({
     mutationFn: ({ id, method }) => collectPayment(id, { payment_method: method, discount_percent: 0 }),
-    onSuccess: () => {
+    onSuccess: (paidOrder) => {
       toast.success('✅ Payment collected!')
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['orders', 'live'] })
       qc.invalidateQueries({ queryKey: ['summary'] })
+      const orderForReceipt = { ...payModal, ...paidOrder }
       setPayModal(null)
+      if (window.electronAPI?.printBill) {
+        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate }, order: orderForReceipt })
+      } else {
+        setReceiptModal(orderForReceipt)
+      }
     },
     onError: e => toast.error(String(e)),
   })
