@@ -7,38 +7,7 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import './index.css'
 
-registerSW({
-  onNeedRefresh(updateSW) {
-    toast(
-      t => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span>Update available</span>
-          <button
-            onClick={() => {
-              toast.dismiss(t.id)
-              updateSW(true)
-              setTimeout(() => {
-                if ('caches' in window) {
-                  caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).then(() => window.location.reload())
-                } else {
-                  window.location.reload()
-                }
-              }, 300)
-            }}
-            style={{
-              background: '#16a34a', color: '#fff', border: 'none',
-              borderRadius: 20, padding: '4px 12px', fontWeight: 700,
-              fontSize: 12, cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            Refresh
-          </button>
-        </div>
-      ),
-      { duration: Infinity, id: 'sw-update', style: { borderRadius: '12px' } }
-    )
-  },
-})
+registerSW()
 
 const queryClient = new QueryClient({
   defaultOptions: {
