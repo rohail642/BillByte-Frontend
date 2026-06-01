@@ -80,13 +80,6 @@ export default function WaiterView() {
     },
     onSuccess: () => {
       toast.success(`Order sent to kitchen — Table ${selectedTable}`)
-      const kotData = {
-        restaurantName: profile?.restaurant_name || '',
-        tableNumber:    selectedTable,
-        items:          cart.map(i => ({ name: i.name, quantity: i.qty })),
-        notes:          '',
-      }
-      if (!printKOTElectron(kotData)) setKotModal(kotData)
       setCart([])
       setSelectedTable(null)
       qc.invalidateQueries({ queryKey: ['activeTables'] })
