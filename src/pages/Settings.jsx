@@ -82,7 +82,7 @@ export default function Settings() {
   const qc = useQueryClient()
 
   const [toggles, setToggles] = useState({
-    whatsapp: true, roundOff: false, loyalty: true,
+    roundOff: false, loyalty: true,
     orderAlert: true, lowStock: true, dailySummary: true, showGst: true,
   })
 
@@ -222,7 +222,6 @@ export default function Settings() {
     if (!profile) return
     setToggles(t => ({
       ...t,
-      whatsapp: profile.whatsapp_sharing ?? true,
       roundOff: profile.round_off ?? false,
       loyalty:  profile.loyalty_enabled ?? true,
     }))
@@ -231,7 +230,7 @@ export default function Settings() {
   const toggle = (k) => {
     const newVal = !toggles[k]
     setToggles(t => ({ ...t, [k]: newVal }))
-    const keyMap = { whatsapp: 'whatsapp_sharing', roundOff: 'round_off', loyalty: 'loyalty_enabled' }
+    const keyMap = { roundOff: 'round_off', loyalty: 'loyalty_enabled' }
     if (keyMap[k]) saveMut.mutate({ [keyMap[k]]: newVal })
   }
 
@@ -304,7 +303,6 @@ export default function Settings() {
       <div className="space-y-4">
         <h3 className="font-display font-bold text-sm text-text">Billing Settings</h3>
         <Card className="space-y-2.5">
-          <Toggle checked={toggles.whatsapp}  onChange={() => toggle('whatsapp')}  label="WhatsApp bill sharing"     description="Send bill to customer via WhatsApp" />
           <Toggle checked={toggles.roundOff}  onChange={() => toggle('roundOff')}  label="Round-off bill amount"     description="Round to nearest ₹10" />
           <Toggle checked={toggles.loyalty}   onChange={() => toggle('loyalty')}   label="Loyalty points on dine-in" description="1 point per ₹10 spent" />
         </Card>

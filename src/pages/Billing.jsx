@@ -13,7 +13,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { Plus, Minus, Trash2, Receipt, CreditCard, UtensilsCrossed, Send, Printer, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { formatINR, printKOTElectron, buildWhatsAppBillUrl } from '../utils'
+import { formatINR, printKOTElectron } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 import { clsx } from 'clsx'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
@@ -180,26 +180,6 @@ export default function Billing() {
           navigate('/')
         } else {
           setKotModal(kotData)
-        }
-      }
-      // WhatsApp bill sharing — show a toast with a direct link (avoids popup blockers)
-      if (order.payment_method && profile?.whatsapp_sharing) {
-        const waUrl = buildWhatsAppBillUrl(order, profile.restaurant_name, foundCustomer?.phone)
-        if (waUrl) {
-          toast((t) => (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 13 }}>📱 Send bill on WhatsApp?</span>
-              <a href={waUrl} target="_blank" rel="noopener noreferrer"
-                onClick={() => toast.dismiss(t.id)}
-                style={{ background: '#25D366', color: 'white', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-                Send
-              </a>
-              <button onClick={() => toast.dismiss(t.id)}
-                style={{ fontSize: 11, color: '#888', background: 'none', border: 'none', cursor: 'pointer' }}>
-                Skip
-              </button>
-            </div>
-          ), { duration: 20000 })
         }
       }
     },
