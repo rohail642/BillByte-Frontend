@@ -171,10 +171,25 @@ export default function POSTerminal() {
       } else if (!order.payment_method) {
         if (!printKOTElectron(kotData)) setKotModal(kotData)
       }
-      // WhatsApp bill sharing — opens wa.me with bill pre-filled if enabled and customer has a phone
+      // WhatsApp bill sharing — show a toast with a direct link (avoids popup blockers)
       if (order.payment_method && profile?.whatsapp_sharing) {
         const waUrl = buildWhatsAppBillUrl(order, profile.restaurant_name, foundCustomer?.phone)
-        if (waUrl) window.open(waUrl, '_blank', 'noopener,noreferrer')
+        if (waUrl) {
+          toast((t) => (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13 }}>📱 Send bill on WhatsApp?</span>
+              <a href={waUrl} target="_blank" rel="noopener noreferrer"
+                onClick={() => toast.dismiss(t.id)}
+                style={{ background: '#25D366', color: 'white', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                Send
+              </a>
+              <button onClick={() => toast.dismiss(t.id)}
+                style={{ fontSize: 11, color: '#888', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Skip
+              </button>
+            </div>
+          ), { duration: 20000 })
+        }
       }
     },
     onError: (e) => toast.error(String(e)),
