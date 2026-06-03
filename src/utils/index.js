@@ -41,20 +41,37 @@ export function buildWhatsAppBillUrl(order, restaurantName, phone) {
   if (normalized.length < 10) return null
 
   const items = (order.items || []).filter(i => !i.cancelled_at)
+
+  const d = order.created_at ? new Date(order.created_at) : new Date()
+  const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
+
   const lines = [
-    `🧾 *Bill — ${restaurantName || 'Restaurant'}*`,
-    `Order #${order.order_number}`,
+    `Dear Customer,`,
     ``,
-    ...items.map(i => `${i.name} ×${i.quantity}  ₹${i.total}`),
+    `Thank you for your recent order at ${restaurantName || 'our restaurant'}! Your invoice is now available. ✨`,
     ``,
-    `Subtotal:  ₹${order.subtotal}`,
+    `💰 Amount : *Rs.${order.total_amount}*`,
+    `📅 Date : ${dateStr} ${timeStr}`,
+    `🧾 Order : #${order.order_number}`,
+    `💳 Payment : ${(order.payment_method || '').toUpperCase()}`,
   ]
-  if ((order.discount_amount || 0) > 0) lines.push(`Discount:  -₹${order.discount_amount}`)
-  lines.push(`GST:       ₹${order.gst_amount}`)
-  lines.push(`*Total:    ₹${order.total_amount}*`)
-  lines.push(`Payment:   ${(order.payment_method || '').toUpperCase()}`)
+
+  if (items.length > 0) {
+    lines.push(``)
+    lines.push(`*Items ordered:*`)
+    items.forEach(i => lines.push(`  • ${i.name} ×${i.quantity}  ₹${i.total}`))
+  }
+
+  if ((order.subtotal || 0) > 0) {
+    lines.push(``)
+    lines.push(`Subtotal : ₹${order.subtotal}`)
+  }
+  if ((order.discount_amount || 0) > 0) lines.push(`🏷️ Discount : -₹${order.discount_amount}`)
+  if ((order.gst_amount || 0) > 0) lines.push(`GST : ₹${order.gst_amount}`)
+
   lines.push(``)
-  lines.push(`Thank you! 🙏`)
+  lines.push(`Loved your experience? Or something to improve? Tap to tell us! 💬✨`)
 
   return `https://wa.me/${normalized}?text=${encodeURIComponent(lines.join('\n'))}`
 }
