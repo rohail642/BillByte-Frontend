@@ -214,7 +214,7 @@ export default function Settings() {
 
   const saveGst = useMutation({
     mutationFn: updateProfile,
-    onSuccess: () => { toast.success('GST settings saved!'); setOverrides({}); qc.invalidateQueries({ queryKey: ['profile'] }) },
+    onSuccess: (data) => { toast.success('GST settings saved!'); setOverrides({}); qc.setQueryData(['profile'], data) },
     onError: (e) => toast.error(String(e)),
   })
 
