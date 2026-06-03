@@ -6,6 +6,9 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../store/auth'
 import client from '../../api/client'
 import { getAnnouncements } from '../../api/announcements'
+import { getDashboardSummary } from '../../api/orders'
+import { getNotifPrefs } from '../../utils/notifPrefs'
+import toast from 'react-hot-toast'
 
 function ExpiryBanner() {
   const { trialEndsAt, plan, user } = useAuthStore()
@@ -106,6 +109,56 @@ export default function AppLayout() {
       if (Object.keys(update).length) useAuthStore.setState(update)
     }).catch(() => {})
   }, [token])
+
+  // Daily sales summary — show wa.me toast to owner at 11 PM
+  useEffect(() => {
+    if (!token || !phone) return
+
+    const checkSummary = async () => {
+      if (!getNotifPrefs().dailySummary) return
+      const now = new Date()
+      if (now.getHours() < 23) return
+      const todayStr = now.toLocaleDateString('en-IN')
+      if (localStorage.getItem('bb_summary_shown_date') === todayStr) return
+
+      try {
+        const summary = await getDashboardSummary()
+        localStorage.setItem('bb_summary_shown_date', todayStr)
+        const digits = String(phone).replace(/\D/g, '')
+        const normalized = digits.length === 10 ? `91${digits}` : digits
+        const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        const lines = [
+          `📊 *Daily Summary — ${restaurantName || 'Restaurant'}*`,
+          `📅 ${dateStr}`,
+          ``,
+          `💰 Revenue: ₹${summary.today_revenue}`,
+          `🧾 Orders: ${summary.today_orders}`,
+          `📊 Avg Bill: ₹${summary.avg_bill}`,
+          ``,
+          `Have a great night! 🌙`,
+        ]
+        const waUrl = `https://wa.me/${normalized}?text=${encodeURIComponent(lines.join('\n'))}`
+        toast((t) => (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 13 }}>📊 Daily summary ready</span>
+            <a href={waUrl} target="_blank" rel="noopener noreferrer"
+              onClick={() => toast.dismiss(t.id)}
+              style={{ background: '#25D366', color: 'white', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              Send
+            </a>
+            <button onClick={() => toast.dismiss(t.id)}
+              style={{ fontSize: 11, color: '#888', background: 'none', border: 'none', cursor: 'pointer' }}>
+              Skip
+            </button>
+          </div>
+        ), { duration: 30000 })
+      } catch {}
+    }
+
+    checkSummary()
+    const interval = setInterval(checkSummary, 60000)
+    return () => clearInterval(interval)
+  }, [token, phone, restaurantName])
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg">

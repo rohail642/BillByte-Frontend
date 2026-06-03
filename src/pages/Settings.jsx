@@ -12,6 +12,7 @@ import Modal from '../components/ui/Modal'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
+import { getNotifPrefs, setNotifPref } from '../utils/notifPrefs'
 import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check, Printer } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -81,9 +82,9 @@ export default function Settings() {
   const [active, setActive] = useState('restaurant')
   const qc = useQueryClient()
 
-  const [toggles, setToggles] = useState({
-    roundOff: false, loyalty: true,
-    orderAlert: true, lowStock: true, dailySummary: true, showGst: true,
+  const [toggles, setToggles] = useState(() => {
+    const p = getNotifPrefs()
+    return { roundOff: false, loyalty: true, showGst: true, orderAlert: p.orderAlert, lowStock: p.lowStock, dailySummary: p.dailySummary }
   })
 
   const [printers, setPrinters]           = useState([{ name: '', type: 'network', ip: '', usbName: '' }])
@@ -232,6 +233,7 @@ export default function Settings() {
     setToggles(t => ({ ...t, [k]: newVal }))
     const keyMap = { roundOff: 'round_off', loyalty: 'loyalty_enabled' }
     if (keyMap[k]) saveMut.mutate({ [keyMap[k]]: newVal })
+    else setNotifPref(k, newVal)
   }
 
   const { user } = useAuthStore()

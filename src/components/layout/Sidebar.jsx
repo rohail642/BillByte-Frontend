@@ -3,6 +3,7 @@ import { useUIStore } from '../../store/ui'
 import { useAuthStore } from '../../store/auth'
 import { useQuery } from '@tanstack/react-query'
 import { getAlerts } from '../../api/inventory'
+import { getNotifPrefs } from '../../utils/notifPrefs'
 import {
   Receipt, ShoppingBag, UtensilsCrossed, Package,
   Users, ChefHat, BarChart2, Settings, LogOut, ClipboardList, Bike, LayoutDashboard, Headphones, Mail, Phone
@@ -51,7 +52,8 @@ export default function Sidebar() {
     refetchInterval: 60000,
     staleTime: 30000,
   })
-  const alertCount = (alerts?.low_stock_count || 0) + (alerts?.expiring_soon_count || 0) + (alerts?.expired_count || 0)
+  const rawAlertCount = (alerts?.low_stock_count || 0) + (alerts?.expiring_soon_count || 0) + (alerts?.expired_count || 0)
+  const alertCount = getNotifPrefs().lowStock ? rawAlertCount : 0
 
   const visibleGroups = NAV_CONFIG
     .map(group => ({

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getOrders, createOrder, updateStatus, collectPayment } from '../api/orders'
 import { getMenuItems } from '../api/menu'
@@ -13,6 +13,25 @@ import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
 import { Plus, Phone, RefreshCw, ChevronDown, Bike, X, Trash2 } from 'lucide-react'
 import { formatINR, timeAgo } from '../utils'
+import { getNotifPrefs } from '../utils/notifPrefs'
+
+function playAlertSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
+    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.12)
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.24)
+    gain.gain.setValueAtTime(0.4, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.45)
+  } catch {}
+}
 
 const PLATFORMS = [
   { id: 'zomato',   label: 'Zomato',   color: 'red',   emoji: '🔴' },
@@ -75,6 +94,21 @@ export default function OnlineOrders() {
     queryKey: ['menuItems'],
     queryFn: () => getMenuItems({ active_only: true }),
   })
+
+  // Detect new pending orders and play alert sound
+  const knownPendingIds = useRef(null)
+  useEffect(() => {
+    if (!orders) return
+    const pendingIds = new Set(orders.filter(o => o.status === 'pending').map(o => o.id))
+    if (knownPendingIds.current === null) { knownPendingIds.current = pendingIds; return }
+    let hasNew = false
+    pendingIds.forEach(id => { if (!knownPendingIds.current.has(id)) hasNew = true })
+    if (hasNew && getNotifPrefs().orderAlert) {
+      playAlertSound()
+      toast('🛵 New order received!', { icon: '🔔', duration: 6000 })
+    }
+    knownPendingIds.current = pendingIds
+  }, [orders])
 
   // Filter client-side
   const filtered = (orders || []).filter(o => {
