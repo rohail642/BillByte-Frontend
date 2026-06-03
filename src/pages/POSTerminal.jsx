@@ -13,7 +13,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { Plus, Minus, Trash2, UtensilsCrossed, Send, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { formatINR, printKOTElectron } from '../utils'
+import { formatINR, printKOTElectron, buildWhatsAppBillUrl } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 import { clsx } from 'clsx'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
@@ -170,6 +170,11 @@ export default function POSTerminal() {
         }
       } else if (!order.payment_method) {
         if (!printKOTElectron(kotData)) setKotModal(kotData)
+      }
+      // WhatsApp bill sharing — opens wa.me with bill pre-filled if enabled and customer has a phone
+      if (order.payment_method && profile?.whatsapp_sharing) {
+        const waUrl = buildWhatsAppBillUrl(order, profile.restaurant_name, foundCustomer?.phone)
+        if (waUrl) window.open(waUrl, '_blank', 'noopener,noreferrer')
       }
     },
     onError: (e) => toast.error(String(e)),

@@ -31,6 +31,34 @@ export const AVATAR_COLORS = [
 ]
 export const avatarColor = (i) => AVATAR_COLORS[i % AVATAR_COLORS.length]
 
+// Build a wa.me URL with the bill pre-filled as a WhatsApp message.
+// Returns null if no valid phone number is available.
+export function buildWhatsAppBillUrl(order, restaurantName, phone) {
+  const raw = phone || order?.customer_phone
+  if (!raw) return null
+  const digits = String(raw).replace(/\D/g, '')
+  const normalized = digits.length === 10 ? `91${digits}` : digits
+  if (normalized.length < 10) return null
+
+  const items = (order.items || []).filter(i => !i.cancelled_at)
+  const lines = [
+    `🧾 *Bill — ${restaurantName || 'Restaurant'}*`,
+    `Order #${order.order_number}`,
+    ``,
+    ...items.map(i => `${i.name} ×${i.quantity}  ₹${i.total}`),
+    ``,
+    `Subtotal:  ₹${order.subtotal}`,
+  ]
+  if ((order.discount_amount || 0) > 0) lines.push(`Discount:  -₹${order.discount_amount}`)
+  lines.push(`GST:       ₹${order.gst_amount}`)
+  lines.push(`*Total:    ₹${order.total_amount}*`)
+  lines.push(`Payment:   ${(order.payment_method || '').toUpperCase()}`)
+  lines.push(``)
+  lines.push(`Thank you! 🙏`)
+
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(lines.join('\n'))}`
+}
+
 // Electron-only: silent TCP print to configured thermal printers
 export function printKOTElectron(kotData) {
   if (window.electronAPI?.printKOT) {
