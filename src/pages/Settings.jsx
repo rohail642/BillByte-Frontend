@@ -86,24 +86,6 @@ export default function Settings() {
     orderAlert: true, lowStock: true, dailySummary: true, showGst: true,
   })
 
-  // Sync billing toggles from profile once loaded
-  useEffect(() => {
-    if (!profile) return
-    setToggles(t => ({
-      ...t,
-      whatsapp: profile.whatsapp_sharing ?? true,
-      roundOff: profile.round_off ?? false,
-      loyalty:  profile.loyalty_enabled ?? true,
-    }))
-  }, [profile])
-
-  const toggle = (k) => {
-    const newVal = !toggles[k]
-    setToggles(t => ({ ...t, [k]: newVal }))
-    const keyMap = { whatsapp: 'whatsapp_sharing', roundOff: 'round_off', loyalty: 'loyalty_enabled' }
-    if (keyMap[k]) saveMut.mutate({ [keyMap[k]]: newVal })
-  }
-
   const [printers, setPrinters]           = useState([{ name: '', type: 'network', ip: '', usbName: '' }])
   const [billPrinter, setBillPrinter]     = useState({ name: '', type: 'network', ip: '', usbName: '' })
   const [savingPrinters, setSavingPrinters] = useState(false)
@@ -234,6 +216,24 @@ export default function Settings() {
     onSuccess: () => { toast.success('GST settings saved!'); setOverrides({}) },
     onError: (e) => toast.error(String(e)),
   })
+
+  // Sync billing toggles from profile once loaded — must be after profile + saveMut
+  useEffect(() => {
+    if (!profile) return
+    setToggles(t => ({
+      ...t,
+      whatsapp: profile.whatsapp_sharing ?? true,
+      roundOff: profile.round_off ?? false,
+      loyalty:  profile.loyalty_enabled ?? true,
+    }))
+  }, [profile])
+
+  const toggle = (k) => {
+    const newVal = !toggles[k]
+    setToggles(t => ({ ...t, [k]: newVal }))
+    const keyMap = { whatsapp: 'whatsapp_sharing', roundOff: 'round_off', loyalty: 'loyalty_enabled' }
+    if (keyMap[k]) saveMut.mutate({ [keyMap[k]]: newVal })
+  }
 
   const { user } = useAuthStore()
   const isOwner = user?.role === 'owner'
