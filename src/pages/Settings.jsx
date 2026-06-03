@@ -82,22 +82,44 @@ export default function Settings() {
   const qc = useQueryClient()
 
   const [toggles, setToggles] = useState({
-    autoPrint: true, whatsapp: true, roundOff: false, loyalty: true,
-    zomato: true, swiggy: true, razorpay: true, tally: false,
+    whatsapp: true, roundOff: false, loyalty: true,
     orderAlert: true, lowStock: true, dailySummary: true, showGst: true,
   })
-  const toggle = k => setToggles(t => ({ ...t, [k]: !t[k] }))
 
-  const [printers, setPrinters]       = useState([{ name: '', ip: '' }])
-  const [billPrinter, setBillPrinter] = useState({ name: '', ip: '' })
+  // Sync billing toggles from profile once loaded
+  useEffect(() => {
+    if (!profile) return
+    setToggles(t => ({
+      ...t,
+      whatsapp: profile.whatsapp_sharing ?? true,
+      roundOff: profile.round_off ?? false,
+      loyalty:  profile.loyalty_enabled ?? true,
+    }))
+  }, [profile])
+
+  const toggle = (k) => {
+    const newVal = !toggles[k]
+    setToggles(t => ({ ...t, [k]: newVal }))
+    const keyMap = { whatsapp: 'whatsapp_sharing', roundOff: 'round_off', loyalty: 'loyalty_enabled' }
+    if (keyMap[k]) saveMut.mutate({ [keyMap[k]]: newVal })
+  }
+
+  const [printers, setPrinters]           = useState([{ name: '', type: 'network', ip: '', usbName: '' }])
+  const [billPrinter, setBillPrinter]     = useState({ name: '', type: 'network', ip: '', usbName: '' })
   const [savingPrinters, setSavingPrinters] = useState(false)
+  const [systemPrinters, setSystemPrinters] = useState([])
 
   useEffect(() => {
     if (!window.electronAPI?.getPrinterConfig) return
     window.electronAPI.getPrinterConfig().then(config => {
-      if (config?.printers?.length) setPrinters(config.printers)
-      if (config?.billPrinter)      setBillPrinter(config.billPrinter)
+      if (config?.printers?.length)
+        setPrinters(config.printers.map(p => ({ name: p.name || '', type: p.type || 'network', ip: p.ip || '', usbName: p.usbName || '' })))
+      if (config?.billPrinter) {
+        const bp = config.billPrinter
+        setBillPrinter({ name: bp.name || '', type: bp.type || 'network', ip: bp.ip || '', usbName: bp.usbName || '' })
+      }
     })
+    window.electronAPI.getSystemPrinters?.().then(names => setSystemPrinters(names || []))
   }, [])
 
   async function savePrinters() {
@@ -282,10 +304,9 @@ export default function Settings() {
       <div className="space-y-4">
         <h3 className="font-display font-bold text-sm text-text">Billing Settings</h3>
         <Card className="space-y-2.5">
-          <Toggle checked={toggles.autoPrint} onChange={() => toggle('autoPrint')} label="Auto-print bill after payment"  description="Printer fires automatically on payment" />
-          <Toggle checked={toggles.whatsapp}  onChange={() => toggle('whatsapp')}  label="WhatsApp bill sharing"          description="Send bill to customer via WhatsApp" />
-          <Toggle checked={toggles.roundOff}  onChange={() => toggle('roundOff')}  label="Round-off bill amount"          description="Round to nearest ₹10" />
-          <Toggle checked={toggles.loyalty}   onChange={() => toggle('loyalty')}   label="Loyalty points on dine-in"      description="1 point per ₹10 spent" />
+          <Toggle checked={toggles.whatsapp}  onChange={() => toggle('whatsapp')}  label="WhatsApp bill sharing"     description="Send bill to customer via WhatsApp" />
+          <Toggle checked={toggles.roundOff}  onChange={() => toggle('roundOff')}  label="Round-off bill amount"     description="Round to nearest ₹10" />
+          <Toggle checked={toggles.loyalty}   onChange={() => toggle('loyalty')}   label="Loyalty points on dine-in" description="1 point per ₹10 spent" />
         </Card>
       </div>
     ),
@@ -681,7 +702,7 @@ export default function Settings() {
           </Card>
         ) : (
           <>
-            <p className="text-xs text-muted">Add up to 3 WiFi thermal printers. Every KOT will be sent to all configured printers simultaneously.</p>
+            <p className="text-xs text-muted">Add up to 3 thermal printers for KOT. Each KOT is sent to all configured printers simultaneously.</p>
             <div className="space-y-3">
               {printers.map((printer, i) => (
                 <Card key={i} className="space-y-3">
@@ -694,13 +715,40 @@ export default function Settings() {
                       </button>
                     )}
                   </div>
+                  <div className="flex gap-1 p-0.5 bg-surface2 rounded-lg w-fit">
+                    {['network', 'usb'].map(t => (
+                      <button key={t}
+                        onClick={() => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, type: t } : pr))}
+                        className={clsx('px-3 py-1 rounded-md text-xs font-semibold transition-colors capitalize',
+                          printer.type === t ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text2')}>
+                        {t === 'network' ? 'WiFi / Network' : 'USB'}
+                      </button>
+                    ))}
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Input label="Printer Name" placeholder="e.g. Kitchen, Counter"
                       value={printer.name}
                       onChange={e => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, name: e.target.value } : pr))} />
-                    <Input label="IP Address" placeholder="e.g. 192.168.1.100"
-                      value={printer.ip}
-                      onChange={e => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, ip: e.target.value } : pr))} />
+                    {printer.type === 'usb' ? (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-semibold text-text2">Windows Printer</label>
+                        {systemPrinters.length > 0 ? (
+                          <select
+                            value={printer.usbName}
+                            onChange={e => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, usbName: e.target.value } : pr))}
+                            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-green">
+                            <option value="">-- Select printer --</option>
+                            {systemPrinters.map(name => <option key={name} value={name}>{name}</option>)}
+                          </select>
+                        ) : (
+                          <p className="text-xs text-muted py-2">No printers detected. Make sure your printer driver is installed.</p>
+                        )}
+                      </div>
+                    ) : (
+                      <Input label="IP Address" placeholder="e.g. 192.168.1.100"
+                        value={printer.ip}
+                        onChange={e => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, ip: e.target.value } : pr))} />
+                    )}
                   </div>
                 </Card>
               ))}
@@ -708,7 +756,7 @@ export default function Settings() {
             <div className="flex items-center justify-between">
               {printers.length < 3 ? (
                 <Button variant="secondary" size="sm" icon={<Plus size={13} />}
-                  onClick={() => setPrinters(p => [...p, { name: '', ip: '' }])}>
+                  onClick={() => setPrinters(p => [...p, { name: '', type: 'network', ip: '', usbName: '' }])}>
                   Add KOT Printer
                 </Button>
               ) : <div />}
@@ -717,13 +765,40 @@ export default function Settings() {
             <h4 className="font-display font-bold text-sm text-text pt-2">Bill Printer</h4>
             <p className="text-xs text-muted">The printer at the billing counter that prints customer receipts.</p>
             <Card className="space-y-3">
+              <div className="flex gap-1 p-0.5 bg-surface2 rounded-lg w-fit">
+                {['network', 'usb'].map(t => (
+                  <button key={t}
+                    onClick={() => setBillPrinter(p => ({ ...p, type: t }))}
+                    className={clsx('px-3 py-1 rounded-md text-xs font-semibold transition-colors capitalize',
+                      billPrinter.type === t ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text2')}>
+                    {t === 'network' ? 'WiFi / Network' : 'USB'}
+                  </button>
+                ))}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input label="Printer Name" placeholder="e.g. Billing Counter"
                   value={billPrinter.name}
                   onChange={e => setBillPrinter(p => ({ ...p, name: e.target.value }))} />
-                <Input label="IP Address" placeholder="e.g. 192.168.1.102"
-                  value={billPrinter.ip}
-                  onChange={e => setBillPrinter(p => ({ ...p, ip: e.target.value }))} />
+                {billPrinter.type === 'usb' ? (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold text-text2">Windows Printer</label>
+                    {systemPrinters.length > 0 ? (
+                      <select
+                        value={billPrinter.usbName}
+                        onChange={e => setBillPrinter(p => ({ ...p, usbName: e.target.value }))}
+                        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-green">
+                        <option value="">-- Select printer --</option>
+                        {systemPrinters.map(name => <option key={name} value={name}>{name}</option>)}
+                      </select>
+                    ) : (
+                      <p className="text-xs text-muted py-2">No printers detected. Make sure your printer driver is installed.</p>
+                    )}
+                  </div>
+                ) : (
+                  <Input label="IP Address" placeholder="e.g. 192.168.1.102"
+                    value={billPrinter.ip}
+                    onChange={e => setBillPrinter(p => ({ ...p, ip: e.target.value }))} />
+                )}
               </div>
             </Card>
 

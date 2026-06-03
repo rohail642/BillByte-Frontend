@@ -32,10 +32,15 @@ export const useCartStore = create((set, get) => ({
   getSubtotal: () => get().items.reduce((s, i) => s + i.price * i.qty, 0),
   getGst:      () => Math.round(get().items.reduce((s, i) => s + i.price * i.qty, 0) * get().gstRate / 100),
   getDiscount: () => Math.round(get().items.reduce((s, i) => s + i.price * i.qty, 0) * get().discountPercent / 100),
-  getTotal:    () => {
+  roundOff: false,
+  setRoundOff: (v) => set({ roundOff: v }),
+
+  getTotal: () => {
     const sub = get().items.reduce((s, i) => s + i.price * i.qty, 0)
     const gst = Math.round(sub * get().gstRate / 100)
     const disc = Math.round(sub * get().discountPercent / 100)
-    return sub + gst - disc
+    const raw = sub + gst - disc
+    if (!get().roundOff) return raw
+    return Math.round(raw / 10) * 10
   },
 }))

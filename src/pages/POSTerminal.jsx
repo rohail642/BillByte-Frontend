@@ -61,10 +61,11 @@ export default function POSTerminal() {
   const { data: profile }       = useQuery({ queryKey: ['profile'],      queryFn: getProfile })
   const { data: activeTables }  = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 10000 })
 
-  // Sync restaurant GST rate into cart store when profile loads
+  // Sync restaurant GST rate and billing settings into cart store when profile loads
   useEffect(() => {
     if (profile?.gst_rate) cart.setGstRate(profile.gst_rate)
-  }, [profile?.gst_rate])
+    if (profile) cart.setRoundOff(profile.round_off ?? false)
+  }, [profile?.gst_rate, profile?.round_off])
 
   const filtered = (menuItems || []).filter(m =>
     (!catFilter || m.category_id === catFilter) &&
@@ -146,8 +147,8 @@ export default function POSTerminal() {
         tableNumber:    kotTable || order.table_number,
         items:          kotItems || [],
         notes:          order.notes || '',
+        orderId:        order.id,
       }
-      if (!printKOTElectron(kotData)) setKotModal(kotData)
       cart.clearCart()
       setFoundCustomer(null)
       setNotFound(false)
@@ -167,8 +168,9 @@ export default function POSTerminal() {
         } else {
           setReceiptModal(order)
         }
+      } else if (!order.payment_method) {
+        if (!printKOTElectron(kotData)) setKotModal(kotData)
       }
-      // KOT sent — stay on POS terminal (no redirect)
     },
     onError: (e) => toast.error(String(e)),
   })
