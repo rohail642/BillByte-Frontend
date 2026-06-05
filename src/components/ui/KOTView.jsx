@@ -14,7 +14,7 @@ export default function KOTView({ data }) {
   const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
 
   const s = {
-    wrap:   { fontFamily: "'Courier New', Courier, monospace", fontSize: 12, maxWidth: 310, margin: '0 auto', padding: '12px 14px', color: '#111', background: '#fff' },
+    wrap:   { fontFamily: "'Courier New', Courier, monospace", fontSize: 12, width: '70mm', maxWidth: '70mm', margin: '0 auto', padding: '12px 14px', color: '#111', background: '#fff' },
     center: { textAlign: 'center' },
     bold:   { fontWeight: 700 },
     muted:  { color: '#555' },
@@ -104,8 +104,10 @@ export function printKOTContent(data) {
 
   const html = `<html><head><title>KOT</title>
     <style>
-      body { margin:0; padding:16px; font-family:'Courier New',Courier,monospace; font-size:12px; max-width:310px; }
-      @media print { body { margin:0 } }
+      * { margin:0; padding:0; box-sizing:border-box; }
+      @page { size: 80mm auto; margin: 3mm 5mm; }
+      body { font-family:'Courier New',Courier,monospace; font-size:11px; width:70mm; padding:4px 0; }
+      @media print { body { padding:0; } }
     </style></head><body>
     <div style="text-align:center;margin-bottom:8px">
       <div style="font-weight:900;font-size:20px;letter-spacing:3px">KOT</div>
@@ -129,7 +131,7 @@ export function printKOTContent(data) {
     ${SEP}${notesHtml}
     </body></html>`
 
-  const win = window.open('', '_blank', 'width=380,height=600')
+  const win = window.open('', '_blank', 'width=320,height=600')
   win.document.write(html)
   win.document.close()
   win.focus()

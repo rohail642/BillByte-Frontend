@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus } from '../api/orders'
 import { getMenuItems, getCategories } from '../api/menu'
@@ -21,8 +21,14 @@ import { formatINR, printKOTElectron } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 
 export default function WaiterView() {
-  const { user, restaurantName, clearAuth } = useAuthStore()
+  const { user, restaurantName, clearAuth, token } = useAuthStore()
   const qc = useQueryClient()
+
+  useEffect(() => {
+    if (!window.electronAPI?.setAuthToken) return
+    if (token) window.electronAPI.setAuthToken(token, restaurantName)
+    return () => { window.electronAPI.clearAuthToken?.() }
+  }, [token, restaurantName])
 
   const [selectedTable, setSelectedTable] = useState(null)
   const [cart, setCart] = useState([])
@@ -78,8 +84,16 @@ export default function WaiterView() {
       await updateStatus(orderId, 'kot_sent')
       return orderId
     },
-    onSuccess: () => {
+    onSuccess: (orderId) => {
       toast.success(`Order sent to kitchen — Table ${selectedTable}`)
+      const kotData = {
+        restaurantName: profile?.restaurant_name || restaurantName || '',
+        tableNumber:    selectedTable,
+        items:          cart.map(c => ({ name: c.name, quantity: c.qty })),
+        notes:          '',
+        orderId,
+      }
+      if (!printKOTElectron(kotData)) setKotModal(kotData)
       setCart([])
       setSelectedTable(null)
       qc.invalidateQueries({ queryKey: ['activeTables'] })

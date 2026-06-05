@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   printBill:         (billData) => ipcRenderer.send('print-bill', billData),
   getPrinterConfig:  ()         => ipcRenderer.invoke('get-printer-config'),
   savePrinterConfig: (config)   => ipcRenderer.invoke('save-printer-config', config),
+  getSystemPrinters: ()         => ipcRenderer.invoke('get-system-printers'),
 })

@@ -39,7 +39,7 @@ export default function ReceiptView({ order, profile }) {
   }[order.order_type] || order.order_type || ''
 
   const s = {
-    wrap:   { fontFamily: "'Courier New', Courier, monospace", fontSize: 12, maxWidth: 310, margin: '0 auto', padding: '12px 14px', color: '#111', background: '#fff' },
+    wrap:   { fontFamily: "'Courier New', Courier, monospace", fontSize: 12, width: '70mm', maxWidth: '70mm', margin: '0 auto', padding: '12px 14px', color: '#111', background: '#fff' },
     center: { textAlign: 'center' },
     right:  { textAlign: 'right' },
     row:    { display: 'flex', justifyContent: 'space-between', marginBottom: 2 },
@@ -165,11 +165,13 @@ export default function ReceiptView({ order, profile }) {
 export function printReceipt() {
   const content = document.getElementById('receipt-print-area')
   if (!content) return
-  const win = window.open('', '_blank', 'width=380,height=750')
+  const win = window.open('', '_blank', 'width=320,height=750')
   win.document.write(`<html><head><title>Receipt</title>
     <style>
-      body { margin: 0; padding: 16px; font-family: 'Courier New', Courier, monospace; }
-      @media print { body { margin: 0 } }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      @page { size: 80mm auto; margin: 3mm 5mm; }
+      body { font-family: 'Courier New', Courier, monospace; width: 70mm; padding: 4px 0; }
+      @media print { body { padding: 0; } }
     </style>
     </head><body>${content.innerHTML}</body></html>`)
   win.document.close()

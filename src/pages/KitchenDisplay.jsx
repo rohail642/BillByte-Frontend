@@ -110,7 +110,7 @@ export default function KitchenDisplay() {
           </div>
           <span className="text-sm font-medium text-text hidden sm:block">{user?.name}</span>
           <button
-            onClick={() => { clearAuth(); window.location.href = '/login' }}
+            onClick={() => { clearAuth(); window.location.hash = '/login' }}
             className="text-muted hover:text-red transition-colors p-1.5 rounded ml-1"
             title="Logout"
           >

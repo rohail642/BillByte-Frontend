@@ -117,13 +117,14 @@ export default function CashierTables() {
       await updateStatus(orderId, 'kot_sent')
       return orderId
     },
-    onSuccess: () => {
+    onSuccess: (orderId) => {
       toast.success(`Order sent to kitchen — Table ${selectedTable}`)
       const kotData = {
         restaurantName: profile?.restaurant_name || '',
         tableNumber:    selectedTable,
         items:          cart.map(i => ({ name: i.name, quantity: i.qty })),
         notes:          '',
+        orderId,
       }
       if (!printKOTElectron(kotData)) setKotModal(kotData)
       setCart([])

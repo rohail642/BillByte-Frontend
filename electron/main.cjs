@@ -2,6 +2,7 @@ const { app, BrowserWindow, shell, session, dialog, ipcMain } = require('electro
 const path = require('path')
 const fs   = require('fs')
 const net  = require('net')
+const os   = require('os')
 const { autoUpdater } = require('electron-updater')
 
 const isDev = !app.isPackaged
@@ -195,6 +196,153 @@ function printToThermal(ip, buffer) {
   })
 }
 
+// ── USB printing via Windows driver (HTML → webContents.print) ───────────────
+
+function printHtmlToUSB(printerName, htmlContent) {
+  return new Promise((resolve, reject) => {
+    const tmpFile = path.join(os.tmpdir(), `bb_receipt_${Date.now()}.html`)
+    fs.writeFileSync(tmpFile, htmlContent, 'utf8')
+
+    const win = new BrowserWindow({
+      show: false,
+      width: 800,
+      height: 1000,
+      webPreferences: { nodeIntegration: false, contextIsolation: true },
+    })
+
+    win.loadFile(tmpFile)
+    win.webContents.once('did-finish-load', () => {
+      win.webContents.print(
+        { silent: true, deviceName: printerName, printBackground: false, pageSize: { width: 80000, height: 297000 } },
+        (success, errorType) => {
+          win.destroy()
+          try { fs.unlinkSync(tmpFile) } catch {}
+          success ? resolve() : reject(new Error(errorType || 'Print failed'))
+        }
+      )
+    })
+  })
+}
+
+// ── HTML receipt builders (for USB/inkjet printers) ───────────────────────────
+
+const RECEIPT_CSS = `
+  * { margin:0; padding:0; box-sizing:border-box; }
+  @page { size: 80mm auto; margin: 3mm 5mm; }
+  body { font-family: 'Courier New', monospace; font-size: 10pt; width: 70mm; margin: 0; }
+  h1 { font-size: 14pt; text-align: center; font-weight: bold; margin-bottom: 3px; }
+  .center { text-align: center; }
+  .line { border-top: 1px dashed #000; margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-weight: bold; border-bottom: 1px solid #000; padding: 2px 0; text-align: left; }
+  td { padding: 2px 0; vertical-align: top; }
+  .r { text-align: right; }
+  .c { text-align: center; }
+  .bold { font-weight: bold; }
+`
+
+function buildKOTHtml(kotData) {
+  const { restaurantName, orderNumber, tableNumber, items, notes } = kotData
+  const now      = new Date()
+  const dateStr  = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  const timeStr  = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+  const tableLabel = tableNumber ? `Table: ${tableNumber}` : 'Takeaway / Delivery'
+  const orderLabel = orderNumber ? `&nbsp;&nbsp;#${orderNumber}` : ''
+  const rows = (items || []).map(i =>
+    `<tr><td style="width:50px">${i.quantity || 1}</td><td>${i.name || ''}</td></tr>`
+  ).join('')
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${RECEIPT_CSS}</style></head><body>
+    <h1>KOT</h1>
+    <div class="center">${restaurantName || 'Restaurant'}</div>
+    <div class="line"></div>
+    <div>${tableLabel}${orderLabel}</div>
+    <div>${dateStr} &nbsp; ${timeStr}</div>
+    <div class="line"></div>
+    <table><thead><tr><th>QTY</th><th>ITEM</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="line"></div>
+    ${notes?.trim() ? `<div><strong>Notes:</strong> ${notes.trim()}</div><div class="line"></div>` : ''}
+  </body></html>`
+}
+
+function buildBillHtml(billData) {
+  const { restaurant: r = {}, order: o = {} } = billData
+  const gstRate   = r.gst_rate ?? 5
+  const halfRate  = (gstRate / 2).toFixed(1)
+  const halfAmt   = ((o.gst_amount || 0) / 2).toFixed(2)
+  const dt        = o.created_at ? new Date(o.created_at) : new Date()
+  const dateStr   = dt.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  const timeStr   = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const typeLabel = { dine_in: 'Dine-In', takeaway: 'Takeaway', delivery: 'Delivery', zomato: 'Zomato', swiggy: 'Swiggy' }[o.order_type] || ''
+  const payLabel  = { cash: 'Cash', upi: 'UPI', card: 'Card' }[o.payment_method] || o.payment_method || ''
+  const items     = (o.items || []).filter(i => !i.cancelled_at)
+  const totalQty  = items.reduce((s, i) => s + i.quantity, 0)
+
+  const rows = items.map((item, idx) => {
+    const amt = item.total || item.price * item.quantity
+    return `<tr>
+      <td style="width:24px">${idx + 1}</td>
+      <td>${item.name}</td>
+      <td class="c" style="width:30px">${item.quantity}</td>
+      <td class="r" style="width:60px">${Number(item.price).toFixed(2)}</td>
+      <td class="r" style="width:60px">${Number(amt).toFixed(2)}</td>
+    </tr>`
+  }).join('')
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${RECEIPT_CSS}</style></head><body>
+    <h1>${r.name || 'Restaurant'}</h1>
+    ${r.phone   ? `<div class="center">PH: ${r.phone}</div>` : ''}
+    ${r.address ? `<div class="center">${r.address}</div>` : ''}
+    ${r.city    ? `<div class="center">${r.city}</div>` : ''}
+    ${r.fssai   ? `<div class="center">FSSAI: ${r.fssai}</div>` : ''}
+    ${r.gstin   ? `<div class="center">GSTIN: ${r.gstin}</div>` : ''}
+    <div class="line"></div>
+    <div>Date: ${dateStr} ${timeStr} &nbsp; ${typeLabel}</div>
+    <div>Bill: #${o.order_number}${o.table_number ? ` &nbsp; Table: ${o.table_number}` : ''}</div>
+    ${payLabel ? `<div>Payment: ${payLabel}</div>` : ''}
+    <div class="line"></div>
+    <table>
+      <thead><tr><th>#</th><th>Item</th><th class="c">Qty</th><th class="r">Rate</th><th class="r">Amt</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="line"></div>
+    <table>
+      <tr><td>Total Qty: ${totalQty}</td><td class="r">Sub: ${Number(o.subtotal || 0).toFixed(2)}</td></tr>
+      <tr><td>CGST (${halfRate}%)</td><td class="r">${halfAmt}</td></tr>
+      <tr><td>SGST (${halfRate}%)</td><td class="r">${halfAmt}</td></tr>
+      ${o.discount_amount > 0 ? `<tr><td>Discount</td><td class="r">-${Number(o.discount_amount).toFixed(2)}</td></tr>` : ''}
+    </table>
+    <div class="line"></div>
+    <table>
+      <tr><td class="bold">Grand Total</td><td class="r bold">Rs.${Number(o.total_amount || 0).toFixed(2)}</td></tr>
+    </table>
+    <div class="line"></div>
+    <div class="center">Thank You, Visit Again!</div>
+    <div class="center">Powered by BillByte</div>
+  </body></html>`
+}
+
+// ── Print routing helpers ─────────────────────────────────────────────────────
+
+function hasValidTarget(p) {
+  return (p.type === 'usb') ? !!p.usbName?.trim() : !!p.ip?.trim()
+}
+
+function printKOTData(printerCfg, kotData) {
+  if (printerCfg.type === 'usb' && printerCfg.usbName?.trim())
+    return printHtmlToUSB(printerCfg.usbName.trim(), buildKOTHtml(kotData))
+  if (printerCfg.ip?.trim())
+    return printToThermal(printerCfg.ip.trim(), buildKOTBuffer(kotData))
+  return Promise.reject(new Error('Printer not configured'))
+}
+
+function printBillData(printerCfg, billData) {
+  if (printerCfg.type === 'usb' && printerCfg.usbName?.trim())
+    return printHtmlToUSB(printerCfg.usbName.trim(), buildBillHtml(billData))
+  if (printerCfg.ip?.trim())
+    return printToThermal(printerCfg.ip.trim(), buildBillBuffer(billData))
+  return Promise.reject(new Error('Printer not configured'))
+}
+
 // ── KOT auto-print polling ────────────────────────────────────────────────────
 
 const API_BASE = 'https://api.billbyte.co.in/api'
@@ -202,7 +350,10 @@ let _authToken       = null
 let _restaurantName  = ''
 let _kotInitialized  = false
 let _pollingTimer    = null
-const _printedKots   = new Set()
+const _printedKots          = new Set()
+const _recentDirectPrints   = new Map()
+const DIRECT_PRINT_TTL      = 30000
+let   _startSeq             = 0
 
 function _getMaxKotNum(items) {
   const nums = (items || []).map(i => i.kot_number || 1)
@@ -229,7 +380,7 @@ async function _initPrintedKots() {
 async function _pollKOTs() {
   if (!_authToken || !_kotInitialized) return
   const config   = readPrinterConfig()
-  const printers = (config.printers || []).filter(p => p.ip?.trim())
+  const printers = (config.printers || []).filter(hasValidTarget)
   if (!printers.length) return
 
   try {
@@ -248,20 +399,23 @@ async function _pollKOTs() {
       if (_printedKots.has(key)) continue
       _printedKots.add(key)
 
+      // skip if this order was just printed directly via IPC
+      const directTs = _recentDirectPrints.get(String(order.id))
+      if (directTs && Date.now() - directTs < DIRECT_PRINT_TTL) continue
+
       const kotItems = allItems
         .filter(i => (i.kot_number || 1) === maxKot)
         .map(i => ({ name: i.name, quantity: i.quantity }))
 
-      const buffer = buildKOTBuffer({
+      const kotPayload = {
         restaurantName: _restaurantName,
         orderNumber:    order.order_number,
         tableNumber:    order.table_number,
         items:          kotItems,
         notes:          order.notes || '',
-      })
-
+      }
       for (const printer of printers) {
-        printToThermal(printer.ip.trim(), buffer).catch(err =>
+        printKOTData(printer, kotPayload).catch(err =>
           console.error(`Auto KOT print failed — ${printer.name}: ${err.message}`)
         )
       }
@@ -272,15 +426,18 @@ async function _pollKOTs() {
 }
 
 function _startPolling() {
-  if (_pollingTimer) clearInterval(_pollingTimer)
+  const seq = ++_startSeq
+  if (_pollingTimer) { clearInterval(_pollingTimer); _pollingTimer = null }
   _kotInitialized = false
   _printedKots.clear()
   _initPrintedKots().then(() => {
+    if (seq !== _startSeq) return  // superseded by a later _startPolling call
     _pollingTimer = setInterval(_pollKOTs, 5000)
   })
 }
 
 function _stopPolling() {
+  _startSeq++
   if (_pollingTimer) { clearInterval(_pollingTimer); _pollingTimer = null }
   _authToken = null; _restaurantName = ''; _kotInitialized = false; _printedKots.clear()
 }
@@ -304,27 +461,34 @@ ipcMain.handle('save-printer-config', (_, config) => {
 
 ipcMain.on('print-kot', (_, kotData) => {
   const config   = readPrinterConfig()
-  const printers = (config.printers || []).filter(p => p.ip && p.ip.trim())
+  const printers = (config.printers || []).filter(hasValidTarget)
   if (!printers.length) return
-
-  const buffer = buildKOTBuffer(kotData)
-
+  if (kotData.orderId) _recentDirectPrints.set(String(kotData.orderId), Date.now())
   for (const printer of printers) {
-    printToThermal(printer.ip.trim(), buffer).catch(err => {
-      console.error(`KOT print failed — ${printer.name} (${printer.ip}): ${err.message}`)
-    })
+    printKOTData(printer, kotData).catch(err =>
+      console.error(`KOT print failed — ${printer.name}: ${err.message}`)
+    )
   }
 })
 
 ipcMain.on('print-bill', (_, billData) => {
+  const orderId = billData?.order?.id
+  if (orderId) _recentDirectPrints.set(String(orderId), Date.now())
   const config      = readPrinterConfig()
   const billPrinter = config.billPrinter
-  if (!billPrinter?.ip?.trim()) return
+  if (!billPrinter || !hasValidTarget(billPrinter)) return
+  printBillData(billPrinter, billData).catch(err =>
+    console.error(`Bill print failed — ${billPrinter.name}: ${err.message}`)
+  )
+})
 
-  const buffer = buildBillBuffer(billData)
-  printToThermal(billPrinter.ip.trim(), buffer).catch(err => {
-    console.error(`Bill print failed — ${billPrinter.name} (${billPrinter.ip}): ${err.message}`)
-  })
+ipcMain.handle('get-system-printers', async () => {
+  const wins = BrowserWindow.getAllWindows()
+  if (!wins.length) return []
+  try {
+    const list = await wins[0].webContents.getPrintersAsync()
+    return list.map(p => p.name)
+  } catch { return [] }
 })
 
 // ── Window ────────────────────────────────────────────────────────────────────
