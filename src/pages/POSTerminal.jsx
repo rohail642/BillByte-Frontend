@@ -17,6 +17,7 @@ import { formatINR, printKOTElectron } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 import { clsx } from 'clsx'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
+import PaymentModal from '../components/payments/PaymentModal'
 
 const PAY_ICONS = { cash: '💵', upi: '📱', card: '💳' }
 
@@ -25,6 +26,8 @@ export default function POSTerminal() {
   const [search, setSearch]             = useState('')
   const [catFilter, setCatFilter]       = useState('')
   const [payModal, setPayModal]         = useState(false)
+  const [pinelabsModal, setPinelabsModal] = useState(null) // { mode, orderId, amount, showReceipt, order }
+  const [pendingPineLabsMode, setPendingPineLabsMode] = useState(null)
   const [receiptModal, setReceiptModal] = useState(null)
   const [kotModal, setKotModal]         = useState(null)
   const [foundCustomer, setFoundCustomer] = useState(null)
@@ -174,6 +177,52 @@ export default function POSTerminal() {
     },
     onError: (e) => toast.error(String(e)),
   })
+
+  // Creates order + sends KOT, then opens Pine Labs terminal modal
+  const createOrderForTerminal = useMutation({
+    mutationFn: async ({ payMode, showReceipt }) => {
+      const itemsPayload = cart.items.map(i => ({ menu_item_id: i.id, name: i.name, price: i.price, quantity: i.qty }))
+      const order = await createOrder({
+        order_type:       cart.orderType,
+        table_number:     cart.tableNumber || null,
+        customer_name:    cart.customerName || null,
+        discount_percent: cart.discountPercent,
+        items:            itemsPayload,
+        customer_id:      foundCustomer?.id || null,
+      })
+      await updateStatus(order.id, 'kot_sent')
+      return { order, payMode, showReceipt }
+    },
+    onSuccess: ({ order, payMode, showReceipt }) => {
+      setPayModal(false)
+      setPinelabsModal({ mode: payMode, orderId: order.id, amount: order.total_amount, showReceipt, order })
+    },
+    onError: (e) => toast.error(String(e)),
+  })
+
+  const handleTerminalPaySuccess = (payMode) => {
+    const { order, showReceipt } = pinelabsModal || {}
+    if (!order) return
+    const paidOrder = { ...order, payment_method: payMode, payment_status: 'paid', status: 'paid' }
+    toast.success(`✅ ${payMode === 'card' ? 'Card' : 'UPI'} payment approved — #${order.order_number}`)
+    cart.clearCart()
+    setFoundCustomer(null)
+    setNotFound(false)
+    setPointsApplied(false)
+    setPinelabsModal(null)
+    qc.invalidateQueries({ queryKey: ['orders'] })
+    qc.invalidateQueries({ queryKey: ['orders', 'live'] })
+    qc.invalidateQueries({ queryKey: ['summary'] })
+    qc.invalidateQueries({ queryKey: ['inventory'] })
+    qc.invalidateQueries({ queryKey: ['alerts'] })
+    if (showReceipt) {
+      if (window.electronAPI?.printBill) {
+        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate }, order: paidOrder })
+      } else {
+        setReceiptModal(paidOrder)
+      }
+    }
+  }
 
   return (
     <div className="h-full flex flex-col md:flex-row gap-4 overflow-hidden">
@@ -491,14 +540,36 @@ export default function POSTerminal() {
               <div className="flex gap-2 justify-center mt-2">
                 {[['cash','💵 Cash'],['upi','📱 UPI'],['card','💳 Card']].map(([m, l]) => (
                   <Button key={m} variant="secondary"
-                    loading={submitOrder.isPending}
-                    onClick={() => submitOrder.mutate({ payMethod: m, showReceipt: payModal === 'receipt' })}>
-                    {l}
+                    loading={submitOrder.isPending || createOrderForTerminal.isPending}
+                    onClick={() => {
+                      const usePineLabs = profile?.pinelabs_enabled && (m === 'card' || m === 'upi')
+                      if (usePineLabs) {
+                        createOrderForTerminal.mutate({ payMode: m, showReceipt: payModal === 'receipt' })
+                      } else {
+                        submitOrder.mutate({ payMethod: m, showReceipt: payModal === 'receipt' })
+                      }
+                    }}>
+                    {l}{profile?.pinelabs_enabled && (m === 'card' || m === 'upi') ? ' →' : ''}
                   </Button>
                 ))}
               </div>
+              {profile?.pinelabs_enabled && (
+                <p className="text-[10px] text-muted mt-3">Card & UPI → Pine Labs terminal</p>
+              )}
             </div>
           </Modal>
+
+          {/* Pine Labs terminal payment modal */}
+          {pinelabsModal && (
+            <PaymentModal
+              open={!!pinelabsModal}
+              mode={pinelabsModal.mode}
+              amount={pinelabsModal.amount}
+              orderId={pinelabsModal.orderId}
+              onSuccess={handleTerminalPaySuccess}
+              onClose={() => setPinelabsModal(null)}
+            />
+          )}
 
           {/* Receipt modal */}
           <Modal open={!!receiptModal} onClose={() => setReceiptModal(null)} title="🧾 Receipt">

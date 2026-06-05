@@ -143,6 +143,10 @@ export default function Settings() {
     razorpay_enabled:    profile.razorpay_enabled    || false,
     razorpay_key_id:     profile.razorpay_key_id     || '',
     razorpay_key_secret: '',
+    pinelabs_enabled:        profile.pinelabs_enabled        || false,
+    pinelabs_merchant_id:    profile.pinelabs_merchant_id    || '',
+    pinelabs_terminal_id:    profile.pinelabs_terminal_id    || '',
+    pinelabs_security_token: '',
   } : {}, [profile])
 
   const [overrides, setOverrides] = useState({})
@@ -411,18 +415,47 @@ export default function Settings() {
           )}
         </Card>
 
-        {/* WhatsApp note */}
-        <Card className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">💬</span>
-            <div>
-              <p className="text-sm font-bold text-text">WhatsApp Orders</p>
-              <p className="text-xs text-muted">No setup needed — staff manually enters WhatsApp orders using the New Order button on the Online Orders page.</p>
+        {/* Pine Labs */}
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🖥️</span>
+              <div>
+                <p className="text-sm font-bold text-text">Pine Labs Terminal</p>
+                <p className="text-xs text-muted">Card & UPI payments via Pine Labs Plutus</p>
+              </div>
             </div>
+            <button
+              role="switch" aria-checked={form.pinelabs_enabled || false}
+              onClick={() => set('pinelabs_enabled', !form.pinelabs_enabled)}
+              className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${form.pinelabs_enabled ? 'bg-green' : 'bg-border2'}`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${form.pinelabs_enabled ? 'left-4' : 'left-0.5'}`} />
+            </button>
           </div>
+          {form.pinelabs_enabled && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <div className="bg-blue-dim rounded-lg p-2.5">
+                <p className="text-[10px] font-bold text-blue uppercase tracking-wide mb-0.5">How to get these credentials</p>
+                <p className="text-xs text-muted">Call Pine Labs merchant support and ask them to enable <strong>Plutus Smart API</strong> on your terminal. They will provide Merchant ID, Terminal ID, and Security Token.</p>
+              </div>
+              <Input label="Merchant ID" placeholder="e.g. 123456"
+                value={form.pinelabs_merchant_id || ''} onChange={e => set('pinelabs_merchant_id', e.target.value)} />
+              <Input label="Terminal ID" placeholder="e.g. 22334455"
+                value={form.pinelabs_terminal_id || ''} onChange={e => set('pinelabs_terminal_id', e.target.value)} />
+              <Input label="Security Token" type="password" placeholder="Provided by Pine Labs"
+                value={form.pinelabs_security_token || ''} onChange={e => set('pinelabs_security_token', e.target.value)} />
+              {profile?.pinelabs_merchant_id && (
+                <div className="flex items-center gap-1.5 text-xs text-green2 font-semibold">
+                  <span>✅</span> Terminal credentials saved
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
-        <Button variant="primary" size="sm" loading={saveMut.isPending}
+
+<Button variant="primary" size="sm" loading={saveMut.isPending}
           onClick={() => saveMut.mutate({
             zomato_enabled: form.zomato_enabled,
             zomato_secret: form.zomato_secret,
@@ -433,6 +466,10 @@ export default function Settings() {
             razorpay_enabled: form.razorpay_enabled,
             razorpay_key_id: form.razorpay_key_id,
             ...(form.razorpay_key_secret ? { razorpay_key_secret: form.razorpay_key_secret } : {}),
+            pinelabs_enabled: form.pinelabs_enabled,
+            pinelabs_merchant_id: form.pinelabs_merchant_id,
+            pinelabs_terminal_id: form.pinelabs_terminal_id,
+            ...(form.pinelabs_security_token ? { pinelabs_security_token: form.pinelabs_security_token } : {}),
           })}>
           Save Integrations
         </Button>
@@ -454,9 +491,11 @@ export default function Settings() {
         {isLoading ? <div className="flex justify-center py-12"><Spinner size="lg" /></div> : (
           <Card className="space-y-3">
             <Input label="GSTIN" value={form.gstin || ''} onChange={e => set('gstin', e.target.value)} placeholder="29AABCT1332L1ZN" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="GST Rate %" type="number" value={form.gst_rate ?? 5} onChange={e => set('gst_rate', Number(e.target.value))} />
-              <Input label="Takeaway GST %" type="number" defaultValue="5" />
+            <div>
+              <Input label="GST Rate % (applies to all orders)" type="number" value={form.gst_rate ?? 5} onChange={e => set('gst_rate', Number(e.target.value))} />
+              <p className="text-xs text-muted mt-1">
+                CGST {((form.gst_rate ?? 5) / 2).toFixed(1)}% + SGST {((form.gst_rate ?? 5) / 2).toFixed(1)}% — applied to dine-in, takeaway & delivery
+              </p>
             </div>
             <Toggle checked={toggles.showGst} onChange={() => toggle('showGst')} label="Show GST breakup on bill" />
             <Button variant="primary" size="sm" loading={saveGst.isPending}

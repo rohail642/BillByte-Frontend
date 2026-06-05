@@ -9,9 +9,14 @@ const Sep = ({ double }) => (
 
 export default function ReceiptView({ order, profile }) {
   const r = profile || {}
-  const gstRate   = r.gst_rate ?? 5
-  const halfRate  = (gstRate / 2).toFixed(1)
-  const halfAmt   = ((order.gst_amount || 0) / 2).toFixed(2)
+
+  // Derive the actual GST rate from stored amounts — immune to profile rate changes
+  const taxable  = (order.subtotal || 0) - (order.discount_amount || 0)
+  const gstRate  = taxable > 0 && order.gst_amount > 0
+    ? Math.round(order.gst_amount / taxable * 1000) / 10
+    : (order.gst_rate ?? r.gst_rate ?? 5)
+  const halfRate = (gstRate / 2).toFixed(1)
+  const halfAmt  = ((order.gst_amount || 0) / 2).toFixed(2)
 
   const items = (() => {
     const grouped = []

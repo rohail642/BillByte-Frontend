@@ -8,7 +8,7 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import { formatINR } from '../utils'
-
+import { Download, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 function download(content, filename, type) {
@@ -319,68 +319,91 @@ export default function Reports() {
 
       {/* Export Reports — full width */}
       <Card>
-        <div className="flex flex-wrap items-start gap-6">
-          {/* Left: title + period + date pickers */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-display font-bold text-sm text-text mb-1">Export Reports</h3>
-            <p className="text-xs text-muted mb-3">Select a period then download as CSV</p>
-            <div className="flex flex-wrap gap-1 mb-3">
-              {EXPORT_PERIODS.map(ep => (
-                <button key={ep.key} onClick={() => setExportPeriod(ep.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
-                    exportPeriod === ep.key
-                      ? 'bg-green text-white border-green'
-                      : 'bg-surface2 text-muted border-border hover:text-text'
-                  }`}>
-                  {ep.label}
-                </button>
-              ))}
-            </div>
-            {exportPeriod === 'custom' && (
-              <div className="flex items-center gap-2 mb-3">
-                <input type="date" value={customFrom} max={customTo}
-                  onChange={e => setCustomFrom(e.target.value)}
-                  className="flex-1 text-xs border border-border rounded-lg px-2 py-1.5 bg-surface text-text focus:outline-none focus:border-green/50" />
-                <span className="text-muted text-xs">to</span>
-                <input type="date" value={customTo} min={customFrom}
-                  onChange={e => setCustomTo(e.target.value)}
-                  className="flex-1 text-xs border border-border rounded-lg px-2 py-1.5 bg-surface text-text focus:outline-none focus:border-green/50" />
-              </div>
-            )}
-            {(() => {
-              const { from, to } = getExportRange(exportPeriod, customFrom, customTo)
-              const label = !from ? 'All orders — no date filter' : fmtRange(from, to)
-              return <p className="text-[11px] text-muted bg-surface2 rounded-lg px-3 py-1.5 inline-block">{label}</p>
-            })()}
+        {/* Header row: title + period selector */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-display font-bold text-sm text-text">Export Reports</h3>
+            <p className="text-xs text-muted">Download data as CSV — open in Excel or Google Sheets</p>
           </div>
+          <div className="flex flex-wrap gap-1 bg-surface2 p-1 rounded-xl">
+            {EXPORT_PERIODS.map(ep => (
+              <button key={ep.key} onClick={() => setExportPeriod(ep.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  exportPeriod === ep.key
+                    ? 'bg-green text-white shadow-sm'
+                    : 'text-muted hover:text-text'
+                }`}>
+                {ep.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {/* Right: download buttons */}
-          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
-            <button onClick={exportCSV} disabled={exporting}
-              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-surface2 border border-border hover:border-green/40 hover:bg-green-dim transition-all disabled:opacity-50">
-              <span className="text-lg">📊</span>
-              <div className="text-left">
-                <p className="text-xs font-semibold text-text">Orders</p>
-                <p className="text-[10px] text-muted">{exporting ? 'Exporting…' : 'CSV'}</p>
-              </div>
-            </button>
-            <button onClick={exportGST} disabled={exportingGST}
-              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-surface2 border border-border hover:border-blue/40 hover:bg-blue-dim transition-all disabled:opacity-50">
-              <span className="text-lg">🧾</span>
-              <div className="text-left">
-                <p className="text-xs font-semibold text-text">GST Summary</p>
-                <p className="text-[10px] text-muted">{exportingGST ? 'Exporting…' : 'CSV'}</p>
-              </div>
-            </button>
-            <button onClick={exportInventory} disabled={exportingInv}
-              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-surface2 border border-border hover:border-orange/40 hover:bg-orange-dim transition-all disabled:opacity-50">
-              <span className="text-lg">📦</span>
-              <div className="text-left">
-                <p className="text-xs font-semibold text-text">Inventory</p>
-                <p className="text-[10px] text-muted">{exportingInv ? 'Exporting…' : 'CSV'}</p>
-              </div>
-            </button>
+        {/* Custom date pickers */}
+        {exportPeriod === 'custom' && (
+          <div className="flex items-center gap-2 mb-3">
+            <input type="date" value={customFrom} max={customTo}
+              onChange={e => setCustomFrom(e.target.value)}
+              className="flex-1 text-xs border border-border rounded-lg px-2.5 py-1.5 bg-surface text-text focus:outline-none focus:border-green/50" />
+            <span className="text-muted text-xs font-medium">to</span>
+            <input type="date" value={customTo} min={customFrom}
+              onChange={e => setCustomTo(e.target.value)}
+              className="flex-1 text-xs border border-border rounded-lg px-2.5 py-1.5 bg-surface text-text focus:outline-none focus:border-green/50" />
           </div>
+        )}
+
+        {/* Date range badge */}
+        {(() => {
+          const { from, to } = getExportRange(exportPeriod, customFrom, customTo)
+          const label = !from ? 'All orders — no date filter' : fmtRange(from, to)
+          return (
+            <div className="flex items-center gap-1.5 mb-4">
+              <Calendar size={12} className="text-muted flex-shrink-0" />
+              <span className="text-xs font-medium text-text2">{label}</span>
+            </div>
+          )
+        })()}
+
+        {/* Divider */}
+        <div className="border-t border-border mb-4" />
+
+        {/* Download cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button onClick={exportCSV} disabled={exporting}
+            className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface2 hover:border-green/40 hover:bg-green-dim transition-all text-left disabled:opacity-50 group">
+            <div className="w-9 h-9 rounded-xl bg-green-dim flex items-center justify-center flex-shrink-0">
+              <span className="text-base">📊</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-text">Orders Report</p>
+              <p className="text-[10px] text-muted leading-tight">{exporting ? 'Exporting…' : 'Items, totals, payment & customer'}</p>
+            </div>
+            <Download size={13} className="text-muted group-hover:text-green transition-colors flex-shrink-0" />
+          </button>
+
+          <button onClick={exportGST} disabled={exportingGST}
+            className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface2 hover:border-blue/40 hover:bg-blue-dim transition-all text-left disabled:opacity-50 group">
+            <div className="w-9 h-9 rounded-xl bg-blue-dim flex items-center justify-center flex-shrink-0">
+              <span className="text-base">🧾</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-text">GST Summary</p>
+              <p className="text-[10px] text-muted leading-tight">{exportingGST ? 'Exporting…' : 'CGST + SGST breakup for filing'}</p>
+            </div>
+            <Download size={13} className="text-muted group-hover:text-blue transition-colors flex-shrink-0" />
+          </button>
+
+          <button onClick={exportInventory} disabled={exportingInv}
+            className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface2 hover:border-orange/40 hover:bg-orange-dim transition-all text-left disabled:opacity-50 group">
+            <div className="w-9 h-9 rounded-xl bg-orange-dim flex items-center justify-center flex-shrink-0">
+              <span className="text-base">📦</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-text">Inventory</p>
+              <p className="text-[10px] text-muted leading-tight">{exportingInv ? 'Exporting…' : 'Stock levels, values & expiry'}</p>
+            </div>
+            <Download size={13} className="text-muted group-hover:text-orange transition-colors flex-shrink-0" />
+          </button>
         </div>
       </Card>
 
