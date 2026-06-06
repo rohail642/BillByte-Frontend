@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMenuItems, getCategories, createMenuItem, updateMenuItem, deleteMenuItem, createCategory, deleteCategory } from '../api/menu'
+import { getMenuItems, getCategories, createMenuItem, updateMenuItem, deleteMenuItem, createCategory, deleteCategory, importMenuFromExcel } from '../api/menu'
 import { getInventory } from '../api/inventory'
 import { getRecipes, saveRecipe, deleteRecipe } from '../api/recipes'
 import toast from 'react-hot-toast'
@@ -12,7 +12,7 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
-import { Plus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags, Upload } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = [
@@ -31,6 +31,8 @@ export default function Menu() {
   const [newCatName,   setNewCatName]  = useState('')
   const [form,         setForm]        = useState({})
   const [ingredients,  setIngredients] = useState([]) // [{inventory_item_id, quantity, unit}]
+  const [importing,    setImporting]   = useState(false)
+  const importInputRef = useRef(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: getCategories })
@@ -66,6 +68,29 @@ export default function Menu() {
     onSuccess: () => { toast.success('Recipe removed.'); refetchRecipes() },
     onError: e => toast.error(String(e))
   })
+
+  const handleExcelImport = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setImporting(true)
+    try {
+      const res = await importMenuFromExcel(file)
+      const { created_categories, created_items, skipped, errors } = res
+      if (created_items > 0) {
+        toast.success(`Imported ${created_items} item${created_items !== 1 ? 's' : ''}${created_categories ? ` & ${created_categories} categor${created_categories !== 1 ? 'ies' : 'y'}` : ''}!`)
+        qc.invalidateQueries({ queryKey: ['menuItems'] })
+        qc.invalidateQueries({ queryKey: ['categories'] })
+      } else {
+        toast.error('No items were imported. Check your file format.')
+      }
+      if (errors?.length) toast.error(`${errors.length} row(s) had errors: ${errors[0]}`)
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Import failed')
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const filtered = (items||[]).filter(m =>
     (!catFilter || Number(m.category_id) === Number(catFilter)) &&
@@ -148,6 +173,10 @@ export default function Menu() {
                 <Tags size={15}/>
               </button>
             </div>
+            <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelImport} />
+            <Button variant="secondary" size="sm" icon={<Upload size={14}/>} loading={importing} onClick={() => importInputRef.current?.click()}>
+              Import Excel
+            </Button>
             <Button variant="primary" size="sm" icon={<Plus size={14}/>} onClick={openAddItem}>Add Item</Button>
           </div>
 
