@@ -161,7 +161,12 @@ export default function Staff() {
 
   const updateMut = useMutation({
     mutationFn: ({ id, ...body }) => updateStaff(id, body),
-    onSuccess: () => { toast.success('Updated!'); refetch(); setEditModal(null) },
+    onSuccess: (_, vars) => {
+      toast.success('Updated!')
+      refetch()
+      setEditModal(null)
+      if (selected) setSelected(s => ({ ...s, ...vars }))
+    },
     onError: e => toast.error(String(e)),
   })
 
@@ -280,6 +285,27 @@ export default function Staff() {
                 onClick={() => attendMut.mutate({ id: noteModal.member.id, status: 'leave', notes: note || null })}>
                 Mark Leave
               </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Edit modal */}
+        <Modal open={!!editModal} onClose={() => setEditModal(null)} title="✏️ Edit Staff"
+          footer={<>
+            <Button variant="secondary" onClick={() => setEditModal(null)}>Cancel</Button>
+            <Button variant="primary" loading={updateMut.isPending}
+              onClick={() => updateMut.mutate({ id:editModal.id, name:form.name, role:form.role, phone:form.phone, salary:Number(form.salary)||0 })}>
+              Save
+            </Button>
+          </>}>
+          <div className="space-y-3">
+            <Input label="Full Name" value={form.name||''} onChange={e=>set('name',e.target.value)} />
+            <Select label="Role" value={form.role||''} onChange={e=>set('role',e.target.value)}>
+              {ROLES.map(r => <option key={r}>{r}</option>)}
+            </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <Input label="Phone" value={form.phone||''} onChange={e=>set('phone',e.target.value)} />
+              <Input label="Monthly Salary (₹)" type="number" value={form.salary||''} onChange={e=>set('salary',e.target.value)} />
             </div>
           </div>
         </Modal>
