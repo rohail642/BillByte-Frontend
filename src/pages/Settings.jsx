@@ -440,11 +440,11 @@ export default function Settings() {
                 <p className="text-[10px] font-bold text-blue uppercase tracking-wide mb-0.5">How to get these credentials</p>
                 <p className="text-xs text-muted">Call Pine Labs merchant support and ask them to enable <strong>Plutus Smart API</strong> on your terminal. They will provide Merchant ID, Terminal ID, and Security Token.</p>
               </div>
-              <Input label="Merchant ID" placeholder="e.g. 123456"
+              <Input label="Merchant ID" placeholder="e.g. 123456" autoComplete="off"
                 value={form.pinelabs_merchant_id || ''} onChange={e => set('pinelabs_merchant_id', e.target.value)} />
-              <Input label="Terminal ID" placeholder="e.g. 22334455"
+              <Input label="Terminal ID" placeholder="e.g. 22334455" autoComplete="off"
                 value={form.pinelabs_terminal_id || ''} onChange={e => set('pinelabs_terminal_id', e.target.value)} />
-              <Input label="Security Token" type="password" placeholder="Provided by Pine Labs"
+              <Input label="Security Token" type="password" placeholder="Provided by Pine Labs" autoComplete="new-password"
                 value={form.pinelabs_security_token || ''} onChange={e => set('pinelabs_security_token', e.target.value)} />
               {profile?.pinelabs_merchant_id && (
                 <div className="flex items-center gap-1.5 text-xs text-green2 font-semibold">
