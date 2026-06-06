@@ -71,7 +71,7 @@ export default function POSTerminal() {
   }, [profile?.gst_rate, profile?.round_off])
 
   const filtered = (menuItems || []).filter(m =>
-    (!catFilter || m.category_id === catFilter) &&
+    (!catFilter || Number(m.category_id) === Number(catFilter)) &&
     (!search || m.name.toLowerCase().includes(search.toLowerCase()))
   )
 

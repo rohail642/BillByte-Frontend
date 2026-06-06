@@ -68,7 +68,7 @@ export default function Menu() {
   })
 
   const filtered = (items||[]).filter(m =>
-    (!catFilter || m.category_id === catFilter) &&
+    (!catFilter || Number(m.category_id) === Number(catFilter)) &&
     (!search || m.name.toLowerCase().includes(search.toLowerCase()))
   )
   const catName = id => (categories||[]).find(c=>c.id===id)?.name || '—'
