@@ -139,14 +139,14 @@ function buildBillBuffer(billData) {
   if (payLabel) parts.push(Buffer.from(`Payment: ${payLabel}\n`))
 
   parts.push(LINE, boldOn)
-  parts.push(Buffer.from(`${lpad('#', 3)}${lpad('Item', 21)}${rpad('Qty', 4)}${rpad('Rate', 8)}${rpad('Amt', 6)}\n`))
+  parts.push(Buffer.from(`${lpad('#', 3)}${lpad('Item', 19)}${rpad('Qty', 4)}${rpad('Rate', 8)}${rpad('Amt', 8)}\n`))
   parts.push(boldOff, LINE)
 
   const items = (o.items || []).filter(i => !i.cancelled_at)
   items.forEach((item, idx) => {
     const amt = (item.total || item.price * item.quantity)
     parts.push(Buffer.from(
-      `${lpad(idx + 1, 3)}${lpad(item.name, 21)}${rpad(item.quantity, 4)}${rpad(Number(item.price).toFixed(2), 8)}${rpad(Number(amt).toFixed(2), 6)}\n`
+      `${lpad(idx + 1, 3)}${lpad(item.name, 19)}${rpad(item.quantity, 4)}${rpad(Number(item.price).toFixed(2), 8)}${rpad(Number(amt).toFixed(2), 8)}\n`
     ))
   })
 
