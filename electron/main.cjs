@@ -84,7 +84,7 @@ function buildKOTBuffer(kotData) {
     parts.push(LINE)
   }
 
-  parts.push(Buffer.from('\n\n\n'))
+  parts.push(Buffer.from('\n\n\n\n\n\n'))
   parts.push(cut)
 
   return Buffer.concat(parts)
@@ -164,7 +164,7 @@ function buildBillBuffer(billData) {
   parts.push(boldOff, LINE, center)
   parts.push(Buffer.from('Thank You, Visit Again!\n'))
   parts.push(Buffer.from('Powered by BillByte\n'))
-  parts.push(Buffer.from('\n\n\n'))
+  parts.push(Buffer.from('\n\n\n\n\n\n'))
   parts.push(cut)
 
   return Buffer.concat(parts)
@@ -228,8 +228,8 @@ function printHtmlToUSB(printerName, htmlContent) {
 
 const RECEIPT_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: 80mm auto; margin: 3mm 5mm; }
-  body { font-family: 'Courier New', monospace; font-size: 10pt; width: 70mm; margin: 0; }
+  @page { size: 80mm auto; margin: 3mm 5mm 15mm 5mm; }
+  body { font-family: 'Courier New', monospace; font-size: 10pt; width: 70mm; margin: 0; padding-bottom: 10mm; }
   h1 { font-size: 14pt; text-align: center; font-weight: bold; margin-bottom: 3px; }
   .center { text-align: center; }
   .line { border-top: 1px dashed #000; margin: 4px 0; }
