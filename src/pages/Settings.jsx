@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProfile, updateProfile } from '../api/auth'
+import { API_URL } from '../api/client'
 import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
 import { useAuthStore } from '../store/auth'
 import Card from '../components/ui/Card'
@@ -346,7 +347,7 @@ export default function Settings() {
               {profile?.restaurant_id && (
                 <div className="bg-surface2 rounded-lg p-2.5">
                   <p className="text-[10px] text-muted mb-1 font-bold uppercase tracking-wide">Your Webhook URL — give this to Zomato:</p>
-                  <code className="text-xs text-green2 break-all">https://yourdomain.com/api/webhooks/zomato/{profile.restaurant_id}</code>
+                  <code className="text-xs text-green2 break-all">{API_URL}/webhooks/zomato/{profile.restaurant_id}</code>
                 </div>
               )}
             </div>
@@ -380,7 +381,7 @@ export default function Settings() {
               {profile?.restaurant_id && (
                 <div className="bg-surface2 rounded-lg p-2.5">
                   <p className="text-[10px] text-muted mb-1 font-bold uppercase tracking-wide">Your Webhook URL — give this to Swiggy:</p>
-                  <code className="text-xs text-green2 break-all">https://yourdomain.com/api/webhooks/swiggy/{profile.restaurant_id}</code>
+                  <code className="text-xs text-green2 break-all">{API_URL}/webhooks/swiggy/{profile.restaurant_id}</code>
                 </div>
               )}
             </div>
