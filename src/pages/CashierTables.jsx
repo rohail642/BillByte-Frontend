@@ -165,7 +165,7 @@ export default function CashierTables() {
     onSuccess: (order) => {
       setPayModal(false)
       if (window.electronAPI?.printBill) {
-        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate }, order })
+        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate, show_gst_breakup: profile?.show_gst_breakup }, order })
       } else {
         setReceiptModal(order)
       }

@@ -155,8 +155,10 @@ function buildBillBuffer(billData) {
 
   parts.push(LINE)
   parts.push(fmtRow(`Total Qty: ${totalQty}`, `Sub: ${Number(o.subtotal || 0).toFixed(2)}`))
-  parts.push(fmtRow(`CGST (${halfRate}%)`, halfAmt))
-  parts.push(fmtRow(`SGST (${halfRate}%)`, halfAmt))
+  if (r.show_gst_breakup !== false) {
+    parts.push(fmtRow(`CGST (${halfRate}%)`, halfAmt))
+    parts.push(fmtRow(`SGST (${halfRate}%)`, halfAmt))
+  }
   if (o.discount_amount > 0) parts.push(fmtRow('Discount', `-${Number(o.discount_amount).toFixed(2)}`))
 
   parts.push(LINE, boldOn)
@@ -307,8 +309,10 @@ function buildBillHtml(billData) {
     <div class="line"></div>
     <table>
       <tr><td>Total Qty: ${totalQty}</td><td class="r">Sub: ${Number(o.subtotal || 0).toFixed(2)}</td></tr>
-      <tr><td>CGST (${halfRate}%)</td><td class="r">${halfAmt}</td></tr>
-      <tr><td>SGST (${halfRate}%)</td><td class="r">${halfAmt}</td></tr>
+      ${r.show_gst_breakup !== false
+        ? `<tr><td>CGST (${halfRate}%)</td><td class="r">${halfAmt}</td></tr>
+      <tr><td>SGST (${halfRate}%)</td><td class="r">${halfAmt}</td></tr>`
+        : ''}
       ${o.discount_amount > 0 ? `<tr><td>Discount</td><td class="r">-${Number(o.discount_amount).toFixed(2)}</td></tr>` : ''}
     </table>
     <div class="line"></div>

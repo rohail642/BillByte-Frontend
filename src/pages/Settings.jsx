@@ -230,13 +230,14 @@ export default function Settings() {
       ...t,
       roundOff: profile.round_off ?? false,
       loyalty:  profile.loyalty_enabled ?? true,
+      showGst:  profile.show_gst_breakup ?? true,
     }))
   }, [profile])
 
   const toggle = (k) => {
     const newVal = !toggles[k]
     setToggles(t => ({ ...t, [k]: newVal }))
-    const keyMap = { roundOff: 'round_off', loyalty: 'loyalty_enabled' }
+    const keyMap = { roundOff: 'round_off', loyalty: 'loyalty_enabled', showGst: 'show_gst_breakup' }
     if (keyMap[k]) saveMut.mutate({ [keyMap[k]]: newVal })
     else setNotifPref(k, newVal)
   }

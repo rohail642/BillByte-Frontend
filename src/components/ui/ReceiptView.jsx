@@ -17,6 +17,7 @@ export default function ReceiptView({ order, profile }) {
     : (order.gst_rate ?? r.gst_rate ?? 5)
   const halfRate = (gstRate / 2).toFixed(1)
   const halfAmt  = ((order.gst_amount || 0) / 2).toFixed(2)
+  const showBreakup = r.show_gst_breakup !== false
 
   const items = (() => {
     const grouped = []
@@ -132,14 +133,18 @@ export default function ReceiptView({ order, profile }) {
           <span>Total Qty: {totalQty}</span>
           <span>Sub Total: {Number(order.subtotal).toFixed(2)}</span>
         </div>
-        <div style={{ ...s.row, ...s.muted }}>
-          <span>CGST ({halfRate}%)</span>
-          <span>{halfAmt}</span>
-        </div>
-        <div style={{ ...s.row, ...s.muted }}>
-          <span>SGST ({halfRate}%)</span>
-          <span>{halfAmt}</span>
-        </div>
+        {showBreakup && (
+          <>
+            <div style={{ ...s.row, ...s.muted }}>
+              <span>CGST ({halfRate}%)</span>
+              <span>{halfAmt}</span>
+            </div>
+            <div style={{ ...s.row, ...s.muted }}>
+              <span>SGST ({halfRate}%)</span>
+              <span>{halfAmt}</span>
+            </div>
+          </>
+        )}
         {order.discount_amount > 0 && (
           <div style={{ ...s.row, ...s.muted }}>
             <span>Discount</span>

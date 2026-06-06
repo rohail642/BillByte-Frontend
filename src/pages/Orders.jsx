@@ -60,7 +60,7 @@ export default function Orders() {
       const orderForReceipt = { ...payModal, ...paidOrder }
       setPayModal(null)
       if (window.electronAPI?.printBill) {
-        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate }, order: orderForReceipt })
+        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate, show_gst_breakup: profile?.show_gst_breakup }, order: orderForReceipt })
       } else {
         setReceiptModal(orderForReceipt)
       }

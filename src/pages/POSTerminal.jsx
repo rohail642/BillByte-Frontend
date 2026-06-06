@@ -66,7 +66,7 @@ export default function POSTerminal() {
 
   // Sync restaurant GST rate and billing settings into cart store when profile loads
   useEffect(() => {
-    if (profile?.gst_rate) cart.setGstRate(profile.gst_rate)
+    if (profile?.gst_rate != null) cart.setGstRate(profile.gst_rate)
     if (profile) cart.setRoundOff(profile.round_off ?? false)
   }, [profile?.gst_rate, profile?.round_off])
 
@@ -167,7 +167,7 @@ export default function POSTerminal() {
       }
       if (showReceipt) {
         if (window.electronAPI?.printBill) {
-          window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate }, order })
+          window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate, show_gst_breakup: profile?.show_gst_breakup }, order })
         } else {
           setReceiptModal(order)
         }
@@ -217,7 +217,7 @@ export default function POSTerminal() {
     qc.invalidateQueries({ queryKey: ['alerts'] })
     if (showReceipt) {
       if (window.electronAPI?.printBill) {
-        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate }, order: paidOrder })
+        window.electronAPI.printBill({ restaurant: { name: profile?.restaurant_name, phone: profile?.phone, address: profile?.address, city: profile?.city, gstin: profile?.gstin, fssai: profile?.fssai, gst_rate: profile?.gst_rate, show_gst_breakup: profile?.show_gst_breakup }, order: paidOrder })
       } else {
         setReceiptModal(paidOrder)
       }
