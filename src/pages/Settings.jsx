@@ -458,10 +458,10 @@ export default function Settings() {
 <Button variant="primary" size="sm" loading={saveMut.isPending}
           onClick={() => saveMut.mutate({
             zomato_enabled: form.zomato_enabled,
-            zomato_secret: form.zomato_secret,
+            ...(form.zomato_secret ? { zomato_secret: form.zomato_secret } : {}),
             zomato_restaurant_id: form.zomato_restaurant_id,
             swiggy_enabled: form.swiggy_enabled,
-            swiggy_secret: form.swiggy_secret,
+            ...(form.swiggy_secret ? { swiggy_secret: form.swiggy_secret } : {}),
             swiggy_restaurant_id: form.swiggy_restaurant_id,
             razorpay_enabled: form.razorpay_enabled,
             razorpay_key_id: form.razorpay_key_id,
