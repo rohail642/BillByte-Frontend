@@ -346,14 +346,40 @@ function printBillData(printerCfg, billData) {
 // ── KOT auto-print polling ────────────────────────────────────────────────────
 
 const API_BASE = 'https://api.billbyte.co.in/api'
-let _authToken       = null
-let _restaurantName  = ''
-let _kotInitialized  = false
-let _pollingTimer    = null
-const _printedKots          = new Set()
-const _recentDirectPrints   = new Map()
-const DIRECT_PRINT_TTL      = 30000
-let   _startSeq             = 0
+let _authToken             = null
+let _restaurantName        = ''
+let _kotInitialized        = false
+let _pollingTimer          = null
+const _printedKots         = new Set()
+const _printedKotsTs       = {}       // key -> timestamp, persisted to disk
+const _recentDirectPrints  = new Map()
+const DIRECT_PRINT_TTL     = 30_000
+const KOT_PERSIST_TTL      = 24 * 60 * 60 * 1000  // keep for 24 h
+let   _startSeq            = 0
+
+function _kotCachePath() {
+  return path.join(app.getPath('userData'), 'printed-kots.json')
+}
+
+function _loadKotCache() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(_kotCachePath(), 'utf8'))
+    const now = Date.now()
+    for (const [key, ts] of Object.entries(raw)) {
+      if (now - ts < KOT_PERSIST_TTL) {
+        _printedKots.add(key)
+        _printedKotsTs[key] = ts
+      }
+    }
+  } catch { /* no cache yet */ }
+}
+
+function _markPrinted(key) {
+  if (_printedKots.has(key)) return
+  _printedKots.add(key)
+  _printedKotsTs[key] = Date.now()
+  try { fs.writeFileSync(_kotCachePath(), JSON.stringify(_printedKotsTs), 'utf8') } catch {}
+}
 
 function _getMaxKotNum(items) {
   const nums = (items || []).map(i => i.kot_number || 1)
@@ -370,9 +396,9 @@ async function _initPrintedKots() {
     const orders = data.items || data || []
     for (const order of orders) {
       const maxKot = _getMaxKotNum(order.items || [])
-      _printedKots.add(`${order.id}-${maxKot}`)
+      _markPrinted(`${order.id}-${maxKot}`)
     }
-  } catch { /* fail open */ } finally {
+  } catch { /* disk cache already loaded — fail open */ } finally {
     _kotInitialized = true
   }
 }
@@ -397,7 +423,7 @@ async function _pollKOTs() {
       const maxKot = _getMaxKotNum(allItems)
       const key    = `${order.id}-${maxKot}`
       if (_printedKots.has(key)) continue
-      _printedKots.add(key)
+      _markPrinted(key)
 
       // skip if this order was just printed directly via IPC
       const directTs = _recentDirectPrints.get(String(order.id))
@@ -430,6 +456,7 @@ function _startPolling() {
   if (_pollingTimer) { clearInterval(_pollingTimer); _pollingTimer = null }
   _kotInitialized = false
   _printedKots.clear()
+  _loadKotCache()  // reload disk cache so restarts/re-logins never reprint old KOTs
   _initPrintedKots().then(() => {
     if (seq !== _startSeq) return  // superseded by a later _startPolling call
     _pollingTimer = setInterval(_pollKOTs, 5000)
