@@ -239,7 +239,7 @@ function printHtmlToUSB(printerName, htmlContent) {
     win.loadFile(tmpFile)
     win.webContents.once('did-finish-load', () => {
       win.webContents.print(
-        { silent: true, deviceName: printerName, printBackground: false, pageSize: { width: 80000, height: 297000 } },
+        { silent: true, deviceName: printerName, printBackground: false, margins: { marginType: 'none' }, pageSize: { width: 80000, height: 297000 } },
         (success, errorType) => {
           win.destroy()
           try { fs.unlinkSync(tmpFile) } catch {}
@@ -254,8 +254,11 @@ function printHtmlToUSB(printerName, htmlContent) {
 
 const RECEIPT_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: 80mm auto; margin: 3mm 2mm 15mm 2mm; }
-  body { font-family: 'Courier New', monospace; font-size: 10pt; width: 72mm; margin: 0; padding-bottom: 10mm; }
+  @page { size: 80mm auto; margin: 0; }
+  /* Content is inset via padding (not page margins) and kept well within an
+     80mm printer's ~72mm printable area: text spans ~4mm to ~66mm, leaving a
+     6mm safety zone on the right so nothing clips. */
+  body { font-family: 'Courier New', monospace; font-size: 10pt; width: 72mm; margin: 0; padding: 3mm 6mm 14mm 4mm; }
   h1 { font-size: 14pt; text-align: center; font-weight: bold; margin-bottom: 3px; }
   .center { text-align: center; }
   .line { border-top: 1px dashed #000; margin: 4px 0; }
