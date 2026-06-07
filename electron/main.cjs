@@ -188,6 +188,7 @@ function buildBillBuffer(billData) {
   parts.push(LINE, boldOn)
   parts.push(fmtRow('Grand Total', `Rs.${Number(o.total_amount || 0).toFixed(2)}`))
   parts.push(boldOff, LINE, center)
+  parts.push(Buffer.from('Prices are inclusive of GST\n'))
   parts.push(Buffer.from('Thank You, Visit Again!\n'))
   parts.push(Buffer.from('Powered by BillByte\n'))
   parts.push(Buffer.from('\n\n\n\n\n\n'))
@@ -347,6 +348,7 @@ function buildBillHtml(billData) {
       <tr><td class="bold">Grand Total</td><td class="r bold">Rs.${Number(o.total_amount || 0).toFixed(2)}</td></tr>
     </table>
     <div class="line"></div>
+    <div class="center">Prices are inclusive of GST</div>
     <div class="center">Thank You, Visit Again!</div>
     <div class="center">Powered by BillByte</div>
   </body></html>`
