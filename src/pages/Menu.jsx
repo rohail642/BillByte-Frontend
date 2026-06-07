@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMenuItems, getCategories, createMenuItem, updateMenuItem, deleteMenuItem, createCategory, deleteCategory, importMenuFromExcel } from '../api/menu'
+import { getMenuItems, getCategories, createMenuItem, updateMenuItem, deleteMenuItem, createCategory, deleteCategory, importMenuFromExcel, clearEntireMenu } from '../api/menu'
 import { getInventory } from '../api/inventory'
 import { getRecipes, saveRecipe, deleteRecipe } from '../api/recipes'
 import toast from 'react-hot-toast'
@@ -12,7 +12,7 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
-import { Plus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags, Upload } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags, Upload, AlertTriangle } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = [
@@ -62,6 +62,25 @@ export default function Menu() {
     onSuccess: () => { toast.success('Category deleted'); qc.invalidateQueries({ queryKey: ['categories'] }) },
     onError: e => toast.error(String(e))
   })
+  const clearMenuMut = useMutation({
+    mutationFn: clearEntireMenu,
+    onSuccess: (res) => {
+      toast.success(`Menu cleared — removed ${res?.deleted_items ?? 0} item(s) & ${res?.deleted_categories ?? 0} categor${(res?.deleted_categories === 1) ? 'y' : 'ies'}`)
+      qc.invalidateQueries({ queryKey: ['menuItems'] })
+      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.invalidateQueries({ queryKey: ['recipes'] })
+      setCatModal(false)
+    },
+    onError: e => toast.error(String(e))
+  })
+
+  const handleClearMenu = () => {
+    const n = (items || []).length, c = (categories || []).length
+    if (!n && !c) { toast.error('The menu is already empty'); return }
+    if (!confirm(`Permanently delete the ENTIRE menu?\n\nThis removes all ${n} item(s) and ${c} categor${c === 1 ? 'y' : 'ies'} (and their recipes). Past orders keep their item names. This cannot be undone.`)) return
+    if (!confirm('Are you absolutely sure? This is your last chance to cancel.')) return
+    clearMenuMut.mutate()
+  }
 
   const deleteRecipeMut = useMutation({
     mutationFn: deleteRecipe,
@@ -340,6 +359,23 @@ export default function Menu() {
               ))}
             </div>
           )}
+
+          {/* Danger zone — wipe the whole menu */}
+          <div className="border border-red/30 rounded-lg p-3 mt-2">
+            <div className="flex items-start gap-2 mb-2">
+              <AlertTriangle size={15} className="text-red flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-red">Danger zone</p>
+                <p className="text-xs text-text3 mt-0.5">
+                  Permanently delete every menu item and category (and their recipes). Past orders keep their item names. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <Button variant="danger" size="sm" icon={<Trash2 size={14}/>}
+              loading={clearMenuMut.isPending} onClick={handleClearMenu}>
+              Clear entire menu
+            </Button>
+          </div>
         </div>
       </Modal>
 

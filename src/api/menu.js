@@ -6,6 +6,7 @@ export const getMenuItems    = (params)   => client.get('/menu/items', { params 
 export const createMenuItem  = body       => client.post('/menu/items', body)
 export const updateMenuItem  = (id, body) => client.patch(`/menu/items/${id}`, body)
 export const deleteMenuItem  = id         => client.delete(`/menu/items/${id}`)
+export const clearEntireMenu = ()         => client.delete('/menu/all')
 export const importMenuFromExcel = (file) => {
   const fd = new FormData()
   fd.append('file', file)

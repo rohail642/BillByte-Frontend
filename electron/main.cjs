@@ -623,6 +623,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 600,
     title: 'BillByte POS',
+    icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
