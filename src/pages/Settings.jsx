@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProfile, updateProfile } from '../api/auth'
+import { getCategories } from '../api/menu'
 import { API_URL } from '../api/client'
 import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
 import { useAuthStore } from '../store/auth'
@@ -88,7 +89,7 @@ export default function Settings() {
     return { roundOff: false, loyalty: true, showGst: true, orderAlert: p.orderAlert, lowStock: p.lowStock, dailySummary: p.dailySummary }
   })
 
-  const [printers, setPrinters]           = useState([{ name: '', type: 'network', ip: '', usbName: '' }])
+  const [printers, setPrinters]           = useState([{ name: '', type: 'network', ip: '', usbName: '', categories: [] }])
   const [billPrinter, setBillPrinter]     = useState({ name: '', type: 'network', ip: '', usbName: '' })
   const [savingPrinters, setSavingPrinters] = useState(false)
   const [systemPrinters, setSystemPrinters] = useState([])
@@ -97,7 +98,7 @@ export default function Settings() {
     if (!window.electronAPI?.getPrinterConfig) return
     window.electronAPI.getPrinterConfig().then(config => {
       if (config?.printers?.length)
-        setPrinters(config.printers.map(p => ({ name: p.name || '', type: p.type || 'network', ip: p.ip || '', usbName: p.usbName || '' })))
+        setPrinters(config.printers.map(p => ({ name: p.name || '', type: p.type || 'network', ip: p.ip || '', usbName: p.usbName || '', categories: Array.isArray(p.categories) ? p.categories : [] })))
       if (config?.billPrinter) {
         const bp = config.billPrinter
         setBillPrinter({ name: bp.name || '', type: bp.type || 'network', ip: bp.ip || '', usbName: bp.usbName || '' })
@@ -123,6 +124,20 @@ export default function Settings() {
     queryKey: ['profile'],
     queryFn: getProfile,
   })
+
+  // Menu categories for KOT printer routing (desktop only)
+  const { data: menuCategories = [] } = useQuery({
+    queryKey: ['menu-categories'],
+    queryFn: () => getCategories().then(r => r.data),
+    enabled: !!window.electronAPI?.isElectron,
+  })
+
+  const togglePrinterCategory = (i, catId) =>
+    setPrinters(p => p.map((pr, j) => {
+      if (j !== i) return pr
+      const cats = Array.isArray(pr.categories) ? pr.categories : []
+      return { ...pr, categories: cats.includes(catId) ? cats.filter(c => c !== catId) : [...cats, catId] }
+    }))
 
   const baseForm = useMemo(() => profile ? {
     name:                profile.name                || '',
@@ -743,7 +758,7 @@ export default function Settings() {
           </Card>
         ) : (
           <>
-            <p className="text-xs text-muted">Add up to 3 thermal printers for KOT. Each KOT is sent to all configured printers simultaneously.</p>
+            <p className="text-xs text-muted">Add up to 3 thermal printers for KOT. Assign menu categories to route items — e.g. drinks to a bar printer, food to the kitchen. A printer with no categories selected prints everything else.</p>
             <div className="space-y-3">
               {printers.map((printer, i) => (
                 <Card key={i} className="space-y-3">
@@ -791,13 +806,32 @@ export default function Settings() {
                         onChange={e => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, ip: e.target.value } : pr))} />
                     )}
                   </div>
+                  <div className="space-y-1.5 pt-1 border-t border-border">
+                    <label className="text-xs font-semibold text-text2 pt-2 block">Print which items?</label>
+                    <p className="text-[11px] text-muted">Pick the menu categories this printer should handle (e.g. drinks → bar printer). Leave all unselected to print <b>everything else</b> not claimed by another printer.</p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {menuCategories.length === 0 ? (
+                        <span className="text-[11px] text-muted">No menu categories found.</span>
+                      ) : menuCategories.map(cat => {
+                        const on = (printer.categories || []).includes(cat.id)
+                        return (
+                          <button key={cat.id} type="button"
+                            onClick={() => togglePrinterCategory(i, cat.id)}
+                            className={clsx('px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                              on ? 'bg-green text-white border-green' : 'bg-surface text-text2 border-border hover:border-green')}>
+                            {on && <Check size={11} className="inline mr-1 -mt-0.5" />}{cat.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </Card>
               ))}
             </div>
             <div className="flex items-center justify-between">
               {printers.length < 3 ? (
                 <Button variant="secondary" size="sm" icon={<Plus size={13} />}
-                  onClick={() => setPrinters(p => [...p, { name: '', type: 'network', ip: '', usbName: '' }])}>
+                  onClick={() => setPrinters(p => [...p, { name: '', type: 'network', ip: '', usbName: '', categories: [] }])}>
                   Add KOT Printer
                 </Button>
               ) : <div />}

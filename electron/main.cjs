@@ -361,6 +361,65 @@ const DIRECT_PRINT_TTL     = 30_000
 const KOT_PERSIST_TTL      = 24 * 60 * 60 * 1000  // keep for 24 h
 let   _startSeq            = 0
 
+// ── Menu category map (for routing KOT items to specific printers) ────────────
+let _menuMap   = null      // { byId: Map<itemId, catId>, byName: Map<lowerName, catId> }
+let _menuMapTs = 0
+const MENU_MAP_TTL = 5 * 60 * 1000
+
+function _printersRouteByCategory(printers) {
+  return printers.some(p => Array.isArray(p.categories) && p.categories.length)
+}
+
+async function _getMenuMap() {
+  if (_menuMap && Date.now() - _menuMapTs < MENU_MAP_TTL) return _menuMap
+  try {
+    const res = await fetch(`${API_BASE}/menu/items`, {
+      headers: { Authorization: `Bearer ${_authToken}` },
+    })
+    if (res.ok) {
+      const data  = await res.json()
+      const items = data.items || data || []
+      const byId = new Map(), byName = new Map()
+      for (const it of items) {
+        if (it.category_id == null) continue
+        byId.set(it.id, it.category_id)
+        if (it.name) byName.set(String(it.name).trim().toLowerCase(), it.category_id)
+      }
+      _menuMap = { byId, byName }; _menuMapTs = Date.now()
+    }
+  } catch { /* keep stale map on failure */ }
+  return _menuMap || { byId: new Map(), byName: new Map() }
+}
+
+function _resolveCategory(item, menuMap) {
+  if (item.menu_item_id != null && menuMap.byId.has(item.menu_item_id)) return menuMap.byId.get(item.menu_item_id)
+  const nm = item.name ? String(item.name).trim().toLowerCase() : ''
+  if (nm && menuMap.byName.has(nm)) return menuMap.byName.get(nm)
+  return null
+}
+
+// Subset of `items` that should print on `printer`, given all configured printers.
+// A printer with no categories = catch-all (prints what no other printer claims).
+function _itemsForPrinter(printer, allPrinters, items, menuMap) {
+  const cats        = (printer.categories || []).map(Number)
+  const claimed     = new Set(allPrinters.flatMap(p => (p.categories || []).map(Number)))
+  const hasCatchAll = allPrinters.some(p => !(p.categories || []).length)
+
+  if (cats.length === 0) {
+    return items.filter(it => { const c = _resolveCategory(it, menuMap); return c == null || !claimed.has(c) })
+  }
+  const set = new Set(cats)
+  const out = items.filter(it => { const c = _resolveCategory(it, menuMap); return c != null && set.has(c) })
+  if (!hasCatchAll) {
+    // No catch-all printer — send orphan/unknown items to every category printer so none are lost
+    for (const it of items) {
+      const c = _resolveCategory(it, menuMap)
+      if ((c == null || !claimed.has(c)) && !out.includes(it)) out.push(it)
+    }
+  }
+  return out
+}
+
 function _kotCachePath() {
   return path.join(app.getPath('userData'), 'printed-kots.json')
 }
@@ -421,6 +480,9 @@ async function _pollKOTs() {
     const data   = await res.json()
     const orders = data.items || data || []
 
+    const routeByCategory = _printersRouteByCategory(printers)
+    const menuMap = routeByCategory ? await _getMenuMap() : null
+
     for (const order of orders) {
       const allItems = (order.items || []).filter(i => !i.cancelled_at)
       if (!allItems.length) continue
@@ -435,17 +497,18 @@ async function _pollKOTs() {
 
       const kotItems = allItems
         .filter(i => (i.kot_number || 1) === maxKot)
-        .map(i => ({ name: i.name, quantity: i.quantity }))
+        .map(i => ({ name: i.name, quantity: i.quantity, menu_item_id: i.menu_item_id }))
 
-      const kotPayload = {
+      const basePayload = {
         restaurantName: _restaurantName,
         orderNumber:    order.order_number,
         tableNumber:    order.table_number,
-        items:          kotItems,
         notes:          order.notes || '',
       }
       for (const printer of printers) {
-        printKOTData(printer, kotPayload).catch(err =>
+        const items = routeByCategory ? _itemsForPrinter(printer, printers, kotItems, menuMap) : kotItems
+        if (!items.length) continue
+        printKOTData(printer, { ...basePayload, items }).catch(err =>
           console.error(`Auto KOT print failed — ${printer.name}: ${err.message}`)
         )
       }
@@ -490,13 +553,18 @@ ipcMain.handle('save-printer-config', (_, config) => {
   return { ok: true }
 })
 
-ipcMain.on('print-kot', (_, kotData) => {
+ipcMain.on('print-kot', async (_, kotData) => {
   const config   = readPrinterConfig()
   const printers = (config.printers || []).filter(hasValidTarget)
   if (!printers.length) return
   if (kotData.orderId) _recentDirectPrints.set(String(kotData.orderId), Date.now())
+  const routeByCategory = _printersRouteByCategory(printers)
+  const menuMap  = routeByCategory ? await _getMenuMap() : null
+  const allItems = kotData.items || []
   for (const printer of printers) {
-    printKOTData(printer, kotData).catch(err =>
+    const items = routeByCategory ? _itemsForPrinter(printer, printers, allItems, menuMap) : allItems
+    if (!items.length) continue
+    printKOTData(printer, { ...kotData, items }).catch(err =>
       console.error(`KOT print failed — ${printer.name}: ${err.message}`)
     )
   }
