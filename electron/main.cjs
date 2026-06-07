@@ -68,10 +68,34 @@ function buildKOTBuffer(kotData) {
     LINE,
   ]
 
+  // 80mm thermal = 48 chars/line. Prefix ` QTY   ` is 7 chars, so names get 41.
+  const NAME_W = 41
+  const wrapName = (str) => {
+    const words = String(str).split(/\s+/).filter(Boolean)
+    const lines = []
+    let cur = ''
+    for (const w of words) {
+      // a single word longer than the line: hard-split it
+      if (w.length > NAME_W) {
+        if (cur) { lines.push(cur); cur = '' }
+        let rest = w
+        while (rest.length > NAME_W) { lines.push(rest.slice(0, NAME_W)); rest = rest.slice(NAME_W) }
+        cur = rest
+        continue
+      }
+      if (!cur) cur = w
+      else if (cur.length + 1 + w.length <= NAME_W) cur += ' ' + w
+      else { lines.push(cur); cur = w }
+    }
+    if (cur) lines.push(cur)
+    return lines.length ? lines : ['']
+  }
+
   for (const item of (items || [])) {
-    const qty  = String(item.quantity || 1).padStart(3)
-    const name = (item.name || '').substring(0, 26)
-    parts.push(Buffer.from(` ${qty}   ${name}\n`))
+    const qty   = String(item.quantity || 1).padStart(3)
+    const lines = wrapName(item.name || '')
+    parts.push(Buffer.from(` ${qty}   ${lines[0]}\n`))
+    for (let i = 1; i < lines.length; i++) parts.push(Buffer.from(`       ${lines[i]}\n`))
   }
 
   parts.push(LINE)
@@ -230,14 +254,14 @@ function printHtmlToUSB(printerName, htmlContent) {
 
 const RECEIPT_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
-  @page { size: 80mm auto; margin: 3mm 5mm 15mm 5mm; }
-  body { font-family: 'Courier New', monospace; font-size: 10pt; width: 70mm; margin: 0; padding-bottom: 10mm; }
+  @page { size: 80mm auto; margin: 3mm 2mm 15mm 2mm; }
+  body { font-family: 'Courier New', monospace; font-size: 10pt; width: 72mm; margin: 0; padding-bottom: 10mm; }
   h1 { font-size: 14pt; text-align: center; font-weight: bold; margin-bottom: 3px; }
   .center { text-align: center; }
   .line { border-top: 1px dashed #000; margin: 4px 0; }
-  table { width: 100%; border-collapse: collapse; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th { font-weight: bold; border-bottom: 1px solid #000; padding: 2px 0; text-align: left; }
-  td { padding: 2px 0; vertical-align: top; }
+  td { padding: 2px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
   .r { text-align: right; }
   .c { text-align: center; }
   .bold { font-weight: bold; }
@@ -251,7 +275,7 @@ function buildKOTHtml(kotData) {
   const tableLabel = tableNumber ? `Table: ${tableNumber}` : 'Takeaway / Delivery'
   const orderLabel = orderNumber ? `&nbsp;&nbsp;#${orderNumber}` : ''
   const rows = (items || []).map(i =>
-    `<tr><td style="width:50px">${i.quantity || 1}</td><td>${i.name || ''}</td></tr>`
+    `<tr><td style="width:34px">${i.quantity || 1}</td><td>${i.name || ''}</td></tr>`
   ).join('')
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${RECEIPT_CSS}</style></head><body>
     <h1>KOT</h1>
