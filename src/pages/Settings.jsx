@@ -127,8 +127,8 @@ export default function Settings() {
 
   // Menu categories for KOT printer routing (desktop only)
   const { data: menuCategories = [] } = useQuery({
-    queryKey: ['menu-categories'],
-    queryFn: () => getCategories().then(r => r.data),
+    queryKey: ['categories'],
+    queryFn: getCategories,
     enabled: !!window.electronAPI?.isElectron,
   })
 
