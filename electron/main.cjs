@@ -28,7 +28,7 @@ function writePrinterConfig(config) {
 // ── ESC/POS builder ──────────────────────────────────────────────────────────
 
 function buildKOTBuffer(kotData) {
-  const { restaurantName, orderNumber, tableNumber, items, notes } = kotData
+  const { restaurantName, orderNumber, tableNumber, customerName, items, notes } = kotData
   const ESC = 0x1b, GS = 0x1d
 
   const init      = Buffer.from([ESC, 0x40])
@@ -59,6 +59,9 @@ function buildKOTBuffer(kotData) {
     boldOff,
     LINE,
     Buffer.from(`${tableLabel}${orderLabel}\n`),
+    ...(customerName && customerName.trim()
+      ? [boldOn, Buffer.from(`Name: ${customerName.trim()}\n`), boldOff]
+      : []),
     Buffer.from(`${dateStr}   ${timeStr}\n`),
     LINE,
     left,
@@ -272,12 +275,13 @@ const RECEIPT_CSS = `
 `
 
 function buildKOTHtml(kotData) {
-  const { restaurantName, orderNumber, tableNumber, items, notes } = kotData
+  const { restaurantName, orderNumber, tableNumber, customerName, items, notes } = kotData
   const now      = new Date()
   const dateStr  = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
   const timeStr  = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
   const tableLabel = tableNumber ? `Table: ${tableNumber}` : 'Takeaway / Delivery'
   const orderLabel = orderNumber ? `&nbsp;&nbsp;#${orderNumber}` : ''
+  const nameRow = customerName?.trim() ? `<div class="bold">Name: ${customerName.trim()}</div>` : ''
   const rows = (items || []).map(i =>
     `<tr><td style="width:34px">${i.quantity || 1}</td><td>${i.name || ''}</td></tr>`
   ).join('')
@@ -286,6 +290,7 @@ function buildKOTHtml(kotData) {
     <div class="center">${restaurantName || 'Restaurant'}</div>
     <div class="line"></div>
     <div>${tableLabel}${orderLabel}</div>
+    ${nameRow}
     <div>${dateStr} &nbsp; ${timeStr}</div>
     <div class="line"></div>
     <table><thead><tr><th>QTY</th><th>ITEM</th></tr></thead><tbody>${rows}</tbody></table>
@@ -532,6 +537,7 @@ async function _pollKOTs() {
         restaurantName: _restaurantName,
         orderNumber:    order.order_number,
         tableNumber:    order.table_number,
+        customerName:   order.customer_name || '',
         notes:          order.notes || '',
       }
       for (const printer of printers) {

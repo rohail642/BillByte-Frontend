@@ -39,6 +39,7 @@ export default function CashierTables() {
   const [lookingUp, setLookingUp] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [pointsApplied, setPointsApplied] = useState(false)
+  const [note, setNote] = useState('')
 
   useEffect(() => {
     if (!customerPhone || customerPhone.length < 10) { setFoundCustomer(null); setNotFound(false); return }
@@ -109,9 +110,9 @@ export default function CashierTables() {
       let orderId = activeTableOrder?.id
 
       if (orderId) {
-        await addItemsToOrder(orderId, { items })
+        await addItemsToOrder(orderId, { items, notes: note || null })
       } else {
-        const newOrder = await createOrder({ order_type: 'dine_in', table_number: String(selectedTable), items })
+        const newOrder = await createOrder({ order_type: 'dine_in', table_number: String(selectedTable), items, notes: note || null })
         orderId = newOrder.id
       }
       await updateStatus(orderId, 'kot_sent')
@@ -123,11 +124,12 @@ export default function CashierTables() {
         restaurantName: profile?.restaurant_name || '',
         tableNumber:    selectedTable,
         items:          cart.map(i => ({ name: i.name, quantity: i.qty })),
-        notes:          '',
+        notes:          note || '',
         orderId,
       }
       if (!printKOTElectron(kotData)) setKotModal(kotData)
       setCart([])
+      setNote('')
       qc.removeQueries({ queryKey: ['tableOrder', selectedTable] })
       qc.invalidateQueries({ queryKey: ['activeTables'] })
       setSelectedTable(null)
@@ -203,9 +205,11 @@ export default function CashierTables() {
   const activeTableOrder = (tableOrder && !['paid', 'cancelled'].includes(tableOrder.status)) ? tableOrder : null
   const existingItems = activeTableOrder?.items || []
 
-  const sections = profile?.table_sections || []
-  const assignedNums = new Set(sections.flatMap(s => s.tables))
-  const unassigned = Array.from({ length: tableCount }, (_, i) => i + 1).filter(n => !assignedNums.has(n))
+  // Each section owns custom-named tables (strings). Legacy fallback: numeric 1..table_count.
+  const rawSections = profile?.table_sections || []
+  const sections = rawSections.length
+    ? rawSections.map(s => ({ ...s, tables: (s.tables || []).map(String) }))
+    : [{ id: '_all', name: 'Tables', color: 'gray', tables: Array.from({ length: tableCount }, (_, i) => String(i + 1)) }]
 
   function TableButton({ n }) {
     const active = activeTableNums.has(String(n))
@@ -224,7 +228,7 @@ export default function CashierTables() {
         )}
       >
         <UtensilsCrossed size={20} className={active ? 'text-green' : 'text-muted'} />
-        <span>T{n}</span>
+        <span>{n}</span>
         {active && <span className="text-[10px] font-normal text-green/70">Active</span>}
       </button>
     )
@@ -238,41 +242,25 @@ export default function CashierTables() {
           <h1 className="text-lg font-bold text-text mb-1">Tables</h1>
           <p className="text-sm text-muted mb-4">Select a table to view its order or add new items</p>
 
-          {sections.length > 0 ? (
-            <div className="space-y-6">
-              {sections.map(section => {
-                const color = SECTION_COLORS[section.color] || '#78716c'
-                return (
-                  <div key={section.id}>
+          <div className="space-y-6">
+            {sections.map(section => {
+              const color = SECTION_COLORS[section.color] || '#78716c'
+              return (
+                <div key={section.id}>
+                  {(sections.length > 1 || section.name) && (
                     <div className="flex items-center gap-2 mb-3">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                      <h2 className="text-sm font-bold text-text">{section.name}</h2>
+                      <h2 className="text-sm font-bold text-text">{section.name || 'Tables'}</h2>
                       <span className="text-xs text-muted">{section.tables.length} tables</span>
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                      {section.tables.map(n => <TableButton key={n} n={n} />)}
-                    </div>
-                  </div>
-                )
-              })}
-              {unassigned.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="w-2.5 h-2.5 rounded-full bg-muted flex-shrink-0" />
-                    <h2 className="text-sm font-bold text-text">General</h2>
-                    <span className="text-xs text-muted">{unassigned.length} tables</span>
-                  </div>
+                  )}
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                    {unassigned.map(n => <TableButton key={n} n={n} />)}
+                    {section.tables.map(n => <TableButton key={n} n={n} />)}
                   </div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-              {Array.from({ length: tableCount }, (_, i) => i + 1).map(n => <TableButton key={n} n={n} />)}
-            </div>
-          )}
+              )
+            })}
+          </div>
         </div>
       ) : (
         /* Split panel: order summary + menu */
@@ -377,6 +365,20 @@ export default function CashierTables() {
 
               {existingItems.length === 0 && cart.length === 0 && (
                 <p className="text-sm text-muted text-center py-6">No items yet — add from the menu</p>
+              )}
+
+              {/* KOT note — e.g. "less spicy". Sent with the next Send to Kitchen. */}
+              {(existingItems.length > 0 || cart.length > 0) && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-1.5">Note for kitchen</p>
+                  <textarea
+                    rows={2}
+                    className="w-full bg-bg border border-border2 rounded-lg px-3 py-2 text-sm outline-none transition-all placeholder:text-muted focus:border-green resize-none"
+                    placeholder="e.g. less spicy, no onion"
+                    value={note}
+                    onChange={e => setNote(e.target.value)}
+                  />
+                </div>
               )}
             </div>
 

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProfile, updateProfile } from '../api/auth'
+import { getProfile, updateProfile, changePassword } from '../api/auth'
 import { getCategories } from '../api/menu'
 import { API_URL } from '../api/client'
 import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
@@ -15,7 +15,7 @@ import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
 import { getNotifPrefs, setNotifPref } from '../utils/notifPrefs'
-import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check, Printer } from 'lucide-react'
+import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check, Printer, KeyRound, X } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const SECTION_COLORS = [
@@ -37,6 +37,7 @@ const SECTIONS = [
   { id: 'gst',           label: 'GST / Tax',     icon: FileText        },
   { id: 'printers',      label: 'Printers',       icon: Printer         },
   { id: 'team',          label: 'Team Access',   icon: Users           },
+  { id: 'security',      label: 'Security',      icon: KeyRound        },
   { id: 'license',       label: 'License',       icon: ShieldCheck     },
 ]
 
@@ -197,19 +198,71 @@ export default function Settings() {
       table_sections: (o.table_sections ?? baseForm.table_sections ?? []).map(s => s.id === id ? { ...s, [key]: val } : s),
     }))
   }
-  function toggleTableInSection(sectionId, tableNum) {
+  // Per-section "add table" input boxes
+  const [tblInput, setTblInput] = useState({})
+
+  // "T1, T2" -> ['T1','T2'];  "T1-10" -> ['T1'..'T10'];  "5" -> ['5']
+  function expandTableNames(raw) {
+    const out = []
+    for (let tok of String(raw).split(',')) {
+      tok = tok.trim()
+      if (!tok) continue
+      const m = tok.match(/^(.*?)(\d+)\s*-\s*(\d+)$/)
+      if (m) {
+        const prefix = m[1]
+        const start = parseInt(m[2], 10)
+        const end = parseInt(m[3], 10)
+        if (start <= end && end - start <= 200) {
+          for (let i = start; i <= end; i++) out.push(`${prefix}${i}`)
+          continue
+        }
+      }
+      out.push(tok)
+    }
+    return out
+  }
+
+  function addTablesToSection(sectionId, raw) {
+    const names = expandTableNames(raw)
+    if (names.length === 0) return
+    setOverrides(o => {
+      const secs = (o.table_sections ?? baseForm.table_sections ?? [])
+      const usedElsewhere = new Set(
+        secs.filter(s => s.id !== sectionId).flatMap(s => (s.tables || []).map(String))
+      )
+      let skipped = 0
+      const next = secs.map(s => {
+        if (s.id !== sectionId) return s
+        const existing = (s.tables || []).map(String)
+        const have = new Set(existing)
+        const added = []
+        for (const n of names) {
+          if (have.has(n) || usedElsewhere.has(n)) { skipped++; continue }
+          have.add(n); added.push(n)
+        }
+        return { ...s, tables: [...existing, ...added] }
+      })
+      if (skipped) toast.error(`${skipped} table name(s) skipped — already in use`)
+      return { ...o, table_sections: next }
+    })
+    setTblInput(t => ({ ...t, [sectionId]: '' }))
+  }
+
+  function removeTableFromSection(sectionId, name) {
     setOverrides(o => ({
       ...o,
-      table_sections: (o.table_sections ?? baseForm.table_sections ?? []).map(s => {
-        if (s.id !== sectionId) return s
-        const has = s.tables.includes(tableNum)
-        return { ...s, tables: has ? s.tables.filter(t => t !== tableNum) : [...s.tables, tableNum].sort((a,b)=>a-b) }
-      }),
+      table_sections: (o.table_sections ?? baseForm.table_sections ?? []).map(s =>
+        s.id === sectionId ? { ...s, tables: (s.tables || []).filter(t => String(t) !== String(name)) } : s
+      ),
     }))
   }
 
   const saveTablesMut = useMutation({
-    mutationFn: () => updateProfile({ table_count: form.table_count, table_sections: form.table_sections }),
+    mutationFn: () => {
+      const sections = form.table_sections || []
+      const total = sections.reduce((n, s) => n + (s.tables || []).length, 0)
+      return updateProfile({ table_count: total || form.table_count, table_sections: sections })
+    },
     onSuccess: () => {
       toast.success('Table settings saved!')
       setOverrides(o => Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'table_count' && k !== 'table_sections')))
@@ -287,6 +340,24 @@ export default function Settings() {
     onSuccess: () => { toast.success('Removed!'); refetchTeam() },
     onError: e => toast.error(String(e)),
   })
+
+  // Change password
+  const [pwForm, setPwForm]   = useState({ current: '', next: '', confirm: '' })
+  const [pwSaving, setPwSaving] = useState(false)
+  const setPW = (k, v) => setPwForm(f => ({ ...f, [k]: v }))
+
+  async function handleChangePassword() {
+    if (!pwForm.current)                        { toast.error('Enter your current password'); return }
+    if (!pwForm.next || pwForm.next.length < 8) { toast.error('New password must be at least 8 characters'); return }
+    if (pwForm.next !== pwForm.confirm)         { toast.error('Passwords do not match'); return }
+    setPwSaving(true)
+    try {
+      await changePassword({ current_password: pwForm.current, new_password: pwForm.next })
+      toast.success('Password changed successfully')
+      setPwForm({ current: '', next: '', confirm: '' })
+    } catch (e) { toast.error(String(e)) }
+    finally { setPwSaving(false) }
+  }
 
   const ROLE_COLORS = { owner: 'purple', cashier: 'green', waiter: 'gray', kitchen: 'orange' }
   const ROLE_ACCESS_LABELS = {
@@ -527,28 +598,18 @@ export default function Settings() {
       <div className="space-y-4">
         <h3 className="font-display font-bold text-sm text-text">Table Management</h3>
 
-        {/* Total count */}
-        <Card className="space-y-3">
-          <div>
-            <p className="text-xs font-semibold text-text mb-0.5">Total Tables</p>
-            <p className="text-[10px] text-muted mb-2">How many physical tables does your restaurant have?</p>
-            <div className="flex items-center gap-3">
-              <input
-                type="number" min="1" max="100"
-                value={form.table_count ?? 10}
-                onChange={e => set('table_count', Number(e.target.value))}
-                className="w-24 bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-green transition-colors"
-              />
-              <span className="text-xs text-muted">tables</span>
-            </div>
-          </div>
-        </Card>
+        <div className="bg-blue-dim rounded-lg px-3 py-2">
+          <p className="text-xs text-text2">
+            Group tables into zones (Main Hall, Lawn, First Floor…) and give each table any name you want —
+            <span className="font-semibold text-text"> T1, L1, F1</span>, etc. Each zone names its own tables, so they don't have to run in one sequence.
+          </p>
+        </div>
 
         {/* Sections */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold text-text">Table Sections</p>
-            <p className="text-[10px] text-muted mt-0.5">Group tables by zone — AC, Non-AC, Outdoor, Rooftop, etc.</p>
+            <p className="text-sm font-bold text-text">Sections</p>
+            <p className="text-[10px] text-muted mt-0.5">Add a zone, then add its tables by name.</p>
           </div>
           <Button variant="secondary" size="sm" icon={<Plus size={13}/>} onClick={addSection}>
             Add Section
@@ -559,15 +620,13 @@ export default function Settings() {
           <Card className="text-center py-6">
             <UtensilsCrossed size={24} className="text-muted mx-auto mb-2" />
             <p className="text-sm text-muted">No sections yet.</p>
-            <p className="text-xs text-muted mt-0.5">Add sections to organize tables by zone (AC, Non-AC, etc.)</p>
+            <p className="text-xs text-muted mt-0.5">Add a section (e.g. Main Hall) to start naming tables.</p>
           </Card>
         )}
 
         {(form.table_sections || []).map((section) => {
           const colorHex = SECTION_COLORS.find(c => c.id === section.color)?.hex || '#78716c'
-          const assignedInOthers = new Set(
-            (form.table_sections || []).filter(s => s.id !== section.id).flatMap(s => s.tables)
-          )
+          const tables = (section.tables || []).map(String)
           return (
             <Card key={section.id} className="space-y-3">
               <div className="flex items-center gap-2">
@@ -592,47 +651,53 @@ export default function Settings() {
                 </div>
                 <input
                   className="flex-1 bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-green transition-colors font-semibold"
-                  placeholder="Section name (e.g. AC, Non-AC, Outdoor…)"
+                  placeholder="Section name (e.g. Main Hall, Lawn, First Floor…)"
                   value={section.name}
                   onChange={e => updateSection(section.id, 'name', e.target.value)}
                 />
-                <span className="text-[10px] text-muted flex-shrink-0">{section.tables.length} tables</span>
+                <span className="text-[10px] text-muted flex-shrink-0">{tables.length} tables</span>
                 <button onClick={() => removeSection(section.id)}
                   className="text-muted hover:text-red transition-colors p-1 rounded flex-shrink-0">
                   <Trash2 size={14}/>
                 </button>
               </div>
 
-              {/* Table number picker */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">
-                  Select tables for this section
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {Array.from({ length: form.table_count ?? 10 }, (_, i) => i + 1).map(n => {
-                    const selected = section.tables.includes(n)
-                    const locked   = !selected && assignedInOthers.has(n)
-                    return (
-                      <button
-                        key={n}
-                        disabled={locked}
-                        onClick={() => toggleTableInSection(section.id, n)}
-                        title={locked ? 'Already in another section' : `Table ${n}`}
-                        className={clsx(
-                          'w-9 h-9 rounded-lg text-xs font-bold border transition-all',
-                          selected
-                            ? 'text-white border-transparent'
-                            : locked
-                              ? 'bg-surface2 border-border text-muted opacity-40 cursor-not-allowed'
-                              : 'bg-surface2 border-border text-text2 hover:border-green/50 hover:text-green'
-                        )}
-                        style={selected ? { background: colorHex, borderColor: colorHex } : {}}
-                      >
-                        {n}
-                      </button>
-                    )
-                  })}
+              {/* Named tables */}
+              <div className="space-y-2">
+                {tables.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {tables.map(name => (
+                      <span key={name}
+                        className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-lg text-xs font-bold text-white"
+                        style={{ background: colorHex }}>
+                        {name}
+                        <button onClick={() => removeTableFromSection(section.id, name)}
+                          className="hover:bg-black/20 rounded p-0.5 transition-colors" title="Remove table">
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted">No tables yet — add some below.</p>
+                )}
+
+                <div className="flex gap-1.5">
+                  <input
+                    className="flex-1 bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-green transition-colors"
+                    placeholder="Add tables — e.g. T1, T2  or  T1-10"
+                    value={tblInput[section.id] || ''}
+                    onChange={e => setTblInput(t => ({ ...t, [section.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTablesToSection(section.id, tblInput[section.id] || '') } }}
+                  />
+                  <Button variant="secondary" size="sm"
+                    onClick={() => addTablesToSection(section.id, tblInput[section.id] || '')}>
+                    Add
+                  </Button>
                 </div>
+                <p className="text-[10px] text-muted">
+                  Type a name and press Enter. Add many at once with commas (<b>T1, T2</b>) or a range (<b>T1-10</b> → T1…T10).
+                </p>
               </div>
             </Card>
           )
@@ -993,6 +1058,38 @@ export default function Settings() {
               value={teamForm.password||''} onChange={e=>setTF('password',e.target.value)} />
           </div>
         </Modal>
+      </div>
+    ),
+
+    security: (
+      <div className="space-y-4">
+        <h3 className="font-display font-bold text-sm text-text">Security</h3>
+        <Card className="space-y-3">
+          <div className="flex items-start gap-2">
+            <KeyRound size={16} className="text-green2 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-text">Change Password</p>
+              <p className="text-xs text-muted">
+                Enter your current password to confirm it's you, then set a new one (at least 8 characters).
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Input label="Current Password" type="password" placeholder="Enter current password"
+              autoComplete="current-password"
+              value={pwForm.current} onChange={e => setPW('current', e.target.value)} />
+            <Input label="New Password" type="password" placeholder="At least 8 characters"
+              autoComplete="new-password"
+              value={pwForm.next} onChange={e => setPW('next', e.target.value)} />
+            <Input label="Confirm New Password" type="password" placeholder="Re-enter new password"
+              autoComplete="new-password"
+              value={pwForm.confirm} onChange={e => setPW('confirm', e.target.value)} />
+            <Button variant="primary" size="sm" loading={pwSaving} onClick={handleChangePassword}>
+              Change Password
+            </Button>
+          </div>
+        </Card>
       </div>
     ),
   }

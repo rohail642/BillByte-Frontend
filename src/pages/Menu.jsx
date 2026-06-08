@@ -32,6 +32,7 @@ export default function Menu() {
   const [form,         setForm]        = useState({})
   const [ingredients,  setIngredients] = useState([]) // [{inventory_item_id, quantity, unit}]
   const [importing,    setImporting]   = useState(false)
+  const [importHelp,   setImportHelp]  = useState(false)
   const importInputRef = useRef(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -105,7 +106,8 @@ export default function Menu() {
       }
       if (errors?.length) toast.error(`${errors.length} row(s) had errors: ${errors[0]}`)
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Import failed')
+      // client interceptor rejects with the backend's detail message as a string
+      toast.error(String(err) || 'Import failed')
     } finally {
       setImporting(false)
     }
@@ -193,7 +195,7 @@ export default function Menu() {
               </button>
             </div>
             <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelImport} />
-            <Button variant="secondary" size="sm" icon={<Upload size={14}/>} loading={importing} onClick={() => importInputRef.current?.click()}>
+            <Button variant="secondary" size="sm" icon={<Upload size={14}/>} loading={importing} onClick={() => setImportHelp(true)}>
               Import Excel
             </Button>
             <Button variant="primary" size="sm" icon={<Plus size={14}/>} onClick={openAddItem}>Add Item</Button>
@@ -326,6 +328,62 @@ export default function Menu() {
           )}
         </div>
       )}
+
+      {/* ── IMPORT EXCEL FORMAT GUIDE ───────────────────────────────── */}
+      <Modal open={importHelp} onClose={() => setImportHelp(false)} title="📄 Import Menu from Excel" size="lg"
+        footer={<>
+          <Button variant="secondary" onClick={() => setImportHelp(false)}>Cancel</Button>
+          <Button variant="primary" icon={<Upload size={14}/>}
+            onClick={() => { setImportHelp(false); importInputRef.current?.click() }}>
+            Choose File
+          </Button>
+        </>}>
+        <div className="space-y-3">
+          <p className="text-sm text-text2">
+            Your Excel sheet should look like the example below — the <b>first row must be the column headings</b>.
+          </p>
+
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-surface2 text-text2">
+                  <th className="text-left font-bold px-3 py-2 border-b border-border">Name</th>
+                  <th className="text-left font-bold px-3 py-2 border-b border-border">Price</th>
+                  <th className="text-left font-bold px-3 py-2 border-b border-border">Category</th>
+                  <th className="text-left font-bold px-3 py-2 border-b border-border">Type</th>
+                </tr>
+              </thead>
+              <tbody className="text-text">
+                {[
+                  ['Paneer Tikka', '220', 'Starters', 'Veg'],
+                  ['Chicken 65',   '260', 'Starters', 'Non-Veg'],
+                  ['Masala Dosa',  '120', 'Main Course', 'Veg'],
+                  ['Coke',         '40',  'Beverages', 'Veg'],
+                ].map((row, i) => (
+                  <tr key={i} className="border-b border-border last:border-0">
+                    {row.map((cell, j) => <td key={j} className="px-3 py-1.5">{cell}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="space-y-1.5 text-xs text-text2">
+            <p className="flex gap-2"><span className="text-green2 font-bold">●</span>
+              <span><b>Name</b> and <b>Price</b> are required.</span></p>
+            <p className="flex gap-2"><span className="text-muted font-bold">○</span>
+              <span><b>Category</b> is optional — any new category names are created automatically.</span></p>
+            <p className="flex gap-2"><span className="text-muted font-bold">○</span>
+              <span><b>Type</b> is optional — Veg, Non-Veg or Egg (defaults to Veg).</span></p>
+          </div>
+
+          <div className="bg-amber-dim border border-amber/20 rounded-lg px-3 py-2">
+            <p className="text-[11px] text-amber font-semibold">
+              Save the file as <b>.xlsx</b> (or .xls). Rows with no name are skipped, and a row with an invalid price is skipped and reported.
+            </p>
+          </div>
+        </div>
+      </Modal>
 
       {/* ── MANAGE CATEGORIES MODAL ─────────────────────────────────── */}
       <Modal open={catModal} onClose={() => { setCatModal(false); setNewCatName('') }} title="🏷️ Manage Categories">

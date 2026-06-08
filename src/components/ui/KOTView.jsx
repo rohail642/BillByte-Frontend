@@ -7,7 +7,7 @@ const Sep = () => (
 )
 
 export default function KOTView({ data }) {
-  const { restaurantName, orderNumber, tableNumber, items = [], notes } = data
+  const { restaurantName, orderNumber, tableNumber, customerName, items = [], notes } = data
 
   const now     = new Date()
   const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' })
@@ -41,6 +41,9 @@ export default function KOTView({ data }) {
           <span>{tableNumber ? `Table: ${tableNumber}` : 'Takeaway / Delivery'}</span>
           {orderNumber && <span style={s.bold}>#{orderNumber}</span>}
         </div>
+        {customerName?.trim() && (
+          <div style={{ ...s.bold, fontSize: 13, marginTop: 2 }}>Name: {customerName.trim()}</div>
+        )}
         <div style={{ ...s.muted }}>
           {dateStr} &nbsp; {timeStr}
         </div>
@@ -84,12 +87,15 @@ export default function KOTView({ data }) {
 }
 
 export function printKOTContent(data) {
-  const { restaurantName, orderNumber, tableNumber, items = [], notes } = data
+  const { restaurantName, orderNumber, tableNumber, customerName, items = [], notes } = data
   const now     = new Date()
   const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' })
   const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
   const tableLabel = tableNumber ? `Table: ${tableNumber}` : 'Takeaway / Delivery'
   const orderLabel = orderNumber ? `<span style="font-weight:700">#${orderNumber}</span>` : ''
+  const nameHtml = customerName?.trim()
+    ? `<div style="font-weight:700;font-size:13px;margin-top:2px">Name: ${customerName.trim()}</div>`
+    : ''
   const SEP = `<div style="border-top:1px dashed #555;margin:6px 0"></div>`
 
   const rows = items.map(i => `
@@ -118,6 +124,7 @@ export function printKOTContent(data) {
       <div style="display:flex;justify-content:space-between;margin-bottom:2px">
         <span>${tableLabel}</span>${orderLabel}
       </div>
+      ${nameHtml}
       <div style="color:#555">${dateStr} &nbsp; ${timeStr}</div>
     </div>
     ${SEP}

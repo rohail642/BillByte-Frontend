@@ -4,7 +4,9 @@ export const useCartStore = create((set, get) => ({
   items: [],
   orderType: 'takeaway',
   tableNumber: '',
-  customerName: '',
+  customerName: '',   // holds the phone number (used for customer lookup/loyalty)
+  guestName: '',      // optional display name printed on the KOT (e.g. takeaway customer)
+  orderNote: '',      // optional KOT note/description (e.g. "less spicy")
   discountPercent: 0,
   activeOrderId: null,
   gstRate: 5,
@@ -21,10 +23,12 @@ export const useCartStore = create((set, get) => ({
     ).filter(Boolean)
   })),
   deleteItem:     (id) => set(s => ({ items: s.items.filter(i => i.id !== id) })),
-  clearCart:       ()  => set({ items: [], discountPercent: 0, customerName: '', tableNumber: '', activeOrderId: null }),
+  clearCart:       ()  => set({ items: [], discountPercent: 0, customerName: '', guestName: '', orderNote: '', tableNumber: '', activeOrderId: null }),
   setOrderType:    (v) => set({ orderType: v }),
   setTableNumber:  (v) => set({ tableNumber: v }),
   setCustomerName: (v) => set({ customerName: v }),
+  setGuestName:    (v) => set({ guestName: v }),
+  setOrderNote:    (v) => set({ orderNote: v }),
   setDiscount:     (v) => set({ discountPercent: v }),
   setActiveOrderId:(v) => set({ activeOrderId: v }),
   setGstRate:      (v) => set({ gstRate: v }),

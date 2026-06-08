@@ -10,5 +10,6 @@ export const clearEntireMenu = ()         => client.delete('/menu/all')
 export const importMenuFromExcel = (file) => {
   const fd = new FormData()
   fd.append('file', file)
-  return client.post('/menu/import-excel', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  // Do NOT set Content-Type manually — the browser must add the multipart boundary.
+  return client.post('/menu/import-excel', fd)
 }

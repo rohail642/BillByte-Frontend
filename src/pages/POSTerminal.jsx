@@ -109,7 +109,8 @@ export default function POSTerminal() {
         order = await createOrder({
           order_type:       cart.orderType,
           table_number:     cart.tableNumber || null,
-          customer_name:    cart.customerName || null,
+          customer_name:    cart.guestName || foundCustomer?.name || cart.customerName || null,
+          notes:            cart.orderNote || null,
           discount_percent: cart.discountPercent,
           items:            itemsPayload,
           customer_id:      foundCustomer?.id || null,
@@ -136,9 +137,11 @@ export default function POSTerminal() {
         showReceipt,
         kotItems: cart.items.map(i => ({ name: i.name, quantity: i.qty })),
         kotTable: cart.tableNumber,
+        kotName:  cart.guestName || foundCustomer?.name || '',
+        kotNote:  cart.orderNote || '',
       }
     },
-    onSuccess: ({ order, showReceipt, kotItems, kotTable }) => {
+    onSuccess: ({ order, showReceipt, kotItems, kotTable, kotName, kotNote }) => {
       toast.success(
         order.payment_method
           ? `✅ Payment done — #${order.order_number}`
@@ -148,8 +151,9 @@ export default function POSTerminal() {
         restaurantName: profile?.restaurant_name || '',
         orderNumber:    order.order_number,
         tableNumber:    kotTable || order.table_number,
+        customerName:   kotName || order.customer_name || '',
         items:          kotItems || [],
-        notes:          order.notes || '',
+        notes:          kotNote || order.notes || '',
         orderId:        order.id,
       }
       cart.clearCart()
@@ -185,7 +189,8 @@ export default function POSTerminal() {
       const order = await createOrder({
         order_type:       cart.orderType,
         table_number:     cart.tableNumber || null,
-        customer_name:    cart.customerName || null,
+        customer_name:    cart.guestName || foundCustomer?.name || cart.customerName || null,
+        notes:            cart.orderNote || null,
         discount_percent: cart.discountPercent,
         items:            itemsPayload,
         customer_id:      foundCustomer?.id || null,
@@ -355,12 +360,13 @@ export default function POSTerminal() {
                 <option value="takeaway">Takeaway</option>
                 <option value="delivery">Delivery</option>
               </Select>
-              <div className="relative">
+              {/* Phone + Name side by side. Name (optional) prints on the KOT. */}
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   className={`w-full bg-bg border rounded-lg px-3 py-1.5 text-sm outline-none transition-all placeholder:text-muted ${
                     foundCustomer ? 'border-green focus:border-green' : 'border-border2 focus:border-green'
                   }`}
-                  placeholder="Phone number to link customer"
+                  placeholder="Phone number"
                   value={cart.customerName}
                   onChange={e => {
                     cart.setCustomerName(e.target.value)
@@ -369,50 +375,56 @@ export default function POSTerminal() {
                     if (pointsApplied) { cart.setDiscount(0); setPointsApplied(false) }
                   }}
                 />
-                {lookingUp && <p className="text-[10px] text-muted mt-1 animate-pulse">🔍 Looking up customer...</p>}
-                {notFound && !lookingUp && cart.customerName.length >= 10 && (
-                  <div className="mt-1.5 bg-orange-dim border border-orange/20 rounded-lg px-3 py-2 flex items-center justify-between">
-                    <p className="text-xs text-orange font-semibold">No customer found</p>
-                    <button
-                      className="text-[10px] bg-orange text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90 transition-opacity"
-                      onClick={() => { setCustName(''); setAddCustModal(true) }}>
-                      + Add New
-                    </button>
-                  </div>
-                )}
-                {foundCustomer && (
-                  <div className="mt-1.5 bg-green-dim border border-green/20 rounded-lg px-3 py-2 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-green2">✅ {foundCustomer.name}</p>
-                      <p className="text-[10px] text-green2">{foundCustomer.loyalty_points} pts available (= ₹{Math.floor(foundCustomer.loyalty_points / 10)} off)</p>
-                    </div>
-                    {foundCustomer.loyalty_points >= 100 && (
-                      pointsApplied ? (
-                        <button
-                          className="text-[10px] bg-red text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90 transition-colors"
-                          onClick={() => { cart.setDiscount(0); setPointsApplied(false) }}>
-                          Remove Points
-                        </button>
-                      ) : (
-                        <button
-                          className="text-[10px] bg-green text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90 transition-colors"
-                          onClick={() => {
-                            const sub = cart.getSubtotal()
-                            if (sub === 0) { toast.error('Add items first'); return }
-                            const ptsToUse = Math.min(foundCustomer.loyalty_points, Math.floor(sub * 10))
-                            const discountRupees = Math.floor(ptsToUse / 10)
-                            const discPct = Math.floor((discountRupees / sub) * 100)
-                            cart.setDiscount(discPct)
-                            setPointsApplied(true)
-                            toast.success(`🎁 ${ptsToUse} points applied = ₹${discountRupees} off!`)
-                          }}>
-                          Apply Points
-                        </button>
-                      )
-                    )}
-                  </div>
-                )}
+                <input
+                  className="w-full bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm outline-none transition-all placeholder:text-muted focus:border-green"
+                  placeholder="Customer name"
+                  value={cart.guestName}
+                  onChange={e => cart.setGuestName(e.target.value)}
+                />
               </div>
+              {lookingUp && <p className="text-[10px] text-muted animate-pulse">🔍 Looking up customer...</p>}
+              {notFound && !lookingUp && cart.customerName.length >= 10 && (
+                <div className="bg-orange-dim border border-orange/20 rounded-lg px-3 py-2 flex items-center justify-between">
+                  <p className="text-xs text-orange font-semibold">No customer found</p>
+                  <button
+                    className="text-[10px] bg-orange text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90 transition-opacity"
+                    onClick={() => { setCustName(''); setAddCustModal(true) }}>
+                    + Add New
+                  </button>
+                </div>
+              )}
+              {foundCustomer && (
+                <div className="bg-green-dim border border-green/20 rounded-lg px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-green2">✅ {foundCustomer.name}</p>
+                    <p className="text-[10px] text-green2">{foundCustomer.loyalty_points} pts available (= ₹{Math.floor(foundCustomer.loyalty_points / 10)} off)</p>
+                  </div>
+                  {foundCustomer.loyalty_points >= 100 && (
+                    pointsApplied ? (
+                      <button
+                        className="text-[10px] bg-red text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90 transition-colors"
+                        onClick={() => { cart.setDiscount(0); setPointsApplied(false) }}>
+                        Remove Points
+                      </button>
+                    ) : (
+                      <button
+                        className="text-[10px] bg-green text-white rounded-lg px-2 py-1 font-semibold hover:opacity-90 transition-colors"
+                        onClick={() => {
+                          const sub = cart.getSubtotal()
+                          if (sub === 0) { toast.error('Add items first'); return }
+                          const ptsToUse = Math.min(foundCustomer.loyalty_points, Math.floor(sub * 10))
+                          const discountRupees = Math.floor(ptsToUse / 10)
+                          const discPct = Math.floor((discountRupees / sub) * 100)
+                          cart.setDiscount(discPct)
+                          setPointsApplied(true)
+                          toast.success(`🎁 ${ptsToUse} points applied = ₹${discountRupees} off!`)
+                        }}>
+                        Apply Points
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
             </Card>
 
             {/* Cart items */}
@@ -441,6 +453,16 @@ export default function POSTerminal() {
                     </button>
                   </div>
                 ))
+              )}
+
+              {/* KOT description — inside the items area, below the selected items */}
+              {cart.items.length > 0 && (
+                <input
+                  className="mt-1 w-full bg-bg border border-border2 rounded-lg px-3 py-2 text-sm outline-none transition-all placeholder:text-muted focus:border-green"
+                  placeholder="Note for kitchen (e.g. less spicy, no onion)"
+                  value={cart.orderNote}
+                  onChange={e => cart.setOrderNote(e.target.value)}
+                />
               )}
             </Card>
 
