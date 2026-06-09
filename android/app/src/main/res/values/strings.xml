@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BillByte POS</string>
+    <string name="title_activity_main">BillByte POS</string>
+    <string name="package_name">com.billbyte.pos</string>
+    <string name="custom_url_scheme">com.billbyte.pos</string>
+</resources>

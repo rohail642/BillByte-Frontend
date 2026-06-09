@@ -4,10 +4,22 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import toast from 'react-hot-toast'
 import { registerSW } from 'virtual:pwa-register'
+import { Capacitor } from '@capacitor/core'
+import { installAndroidPrinterBridge } from './native/printerBridge'
+import { initLiveUpdates } from './native/liveUpdate'
 import App from './App'
 import './index.css'
 
-registerSW()
+if (Capacitor.isNativePlatform()) {
+  // Native Android app: install the silent ESC/POS printing bridge before
+  // React mounts, and use Capgo OTA for updates. The PWA service worker is
+  // intentionally NOT registered here — it would re-introduce stale-cache
+  // update problems and conflict with OTA bundle swapping.
+  installAndroidPrinterBridge()
+  initLiveUpdates()
+} else {
+  registerSW()
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {

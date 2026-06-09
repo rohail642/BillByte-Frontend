@@ -165,6 +165,66 @@ electron/
 
 **vite.config.js** has `base: './'` — required so Electron can load built files via `file://`.
 
+## Android App (Capacitor)
+
+The same React build is shipped to the **Google Play Store** as a native Android app via Capacitor. It exists primarily for two things a PWA cannot do: **silent thermal printing** (no OS print dialog) and **reliable OTA updates** (no service-worker stale-cache problem). The web code is shared — there is no separate mobile codebase.
+
+```
+android/                                  — generated native project (committed; build artifacts gitignored)
+  app/src/main/java/com/billbyte/pos/
+    MainActivity.java                     — registers EscPosPrinterPlugin
+    EscPosPrinterPlugin.java             — native TCP raw-print to ip:9100 (no dialog)
+src/native/
+  escpos.js                               — ESC/POS KOT + bill byte builders (ported 1:1 from electron/main.cjs)
+  printerBridge.js                        — installs a window.electronAPI-compatible shim on Android
+  liveUpdate.js                           — Capgo self-hosted OTA (silent, applies on next launch)
+capacitor.config.json
+scripts/make-ota-bundle.mjs               — zips dist/ into an OTA bundle + latest.json manifest
+```
+
+**Key idea — the `window.electronAPI` shim:** on Android, `installAndroidPrinterBridge()` (called in `main.jsx` before React mounts) installs a `window.electronAPI` object exposing `printKOT` / `printBill` (plus `refreshPrinterConfig`). So the existing Send KOT / bill-print call sites work unchanged. `isAndroid: true` is set so Settings can hide the desktop-only USB tab.
+
+**Printer config is server-side and shared.** The owner configures printers once in Settings → it saves to `restaurant.printer_config` on the backend (`PUT /api/auth/printer-config`, owner/manager only). Every device reads it (`GET /api/auth/printer-config`, any logged-in user). So when a **waiter sends a KOT from their phone, it prints directly to the printer the owner configured** — the waiter configures nothing. There is **no per-device polling and no "auto-print station"** — printing is the direct path only: tap Send KOT → ESC/POS bytes go straight to the printer.
+
+**Printing:** network (WiFi/LAN) thermal printers only on mobile — the bridge fetches the config (cached ~10s), routes items by category, opens a TCP socket to `ip:9100`, and writes raw ESC/POS bytes via the native `EscPosPrinterPlugin`. No print dialog. USB is desktop-only.
+
+**Settings save fans out:** `savePrinters()` writes to the backend (source of truth), then mirrors to `window.electronAPI.savePrinterConfig` (desktop's local file = offline cache) and calls `refreshPrinterConfig` (mobile, to drop the cached config).
+
+**Desktop reads config from the backend too.** `electron/main.cjs` `getEffectiveConfig()` fetches `/api/auth/printer-config` (cached ~10s): the backend config wins when it has printers, otherwise it falls back to the local file (legacy setups / offline / not yet configured on the server). So the owner configures printers once from **any** device and the PC picks it up. The desktop KOT poller and both print IPC handlers all go through `getEffectiveConfig()`; `save-printer-config` clears the cache so changes apply immediately.
+
+**PC-as-gateway topology (recommended for USB/Bluetooth printers).** A printer without an IP (USB, or BT) can't be shared across many phones. The clean setup: run the **desktop app on the counter PC** with the printer attached. Waiters send KOTs from phones (no printer configured on the phones → they only create the order); the PC's KOT poller picks up every `kot_sent` order from the backend (~5s) and prints it — including online Zomato/Swiggy orders. Phones are order terminals; the PC is the single print brain. Mobile direct-print (WiFi printer at ip:9100) and the PC-gateway model can also coexist.
+
+**Online Zomato/Swiggy order printing on mobile is intentionally NOT handled yet** (deferred). Those orders arrive with no device "sending" them; the desktop poller prints them (incl. in the gateway model above). Revisit only for genuinely mobile-only restaurants.
+
+**Service worker is disabled on native** (`main.jsx` only calls `registerSW()` on web) so it never fights OTA bundle swapping or re-introduces stale caching.
+
+### Commands
+
+```bash
+npm run android:sync     # vite build + cap sync android
+npm run android:open     # build + sync + open Android Studio
+npm run android:apk      # build + sync + gradlew assembleRelease (.apk)
+npm run android:bundle   # build + sync + gradlew bundleRelease (.aab for Play Store)
+```
+
+Toolchain notes: the Gradle wrapper is pinned to **8.11.1** and AGP to **8.7.2** so the project builds with **JDK 23** (the default Gradle 8.2.1 that Capacitor ships cannot parse JDK 23). `compileSdk`/`targetSdk` are **35** (Play Store requirement + Capgo's work-runtime transitive). `android/local.properties` must point `sdk.dir` at the Android SDK using **forward slashes** (Java-properties escaping mangles backslashes).
+
+### Silent OTA releases (Capgo, self-hosted — no paid Appflow)
+
+The app does NOT auto-update against Capgo cloud. On launch it fetches `VITE_OTA_MANIFEST_URL` (default `https://app.billbyte.co.in/ota/latest.json`), and if the manifest `version` differs from the running bundle it downloads the new web bundle and stages it for the **next** app launch (never mid-shift).
+
+To ship a web-only update (no Play Store review needed):
+1. Bump `version` in `package.json`.
+2. `npm run build`
+3. `npm run ota:zip` → produces `release/ota/billbyte-<version>.zip` + `latest.json`.
+4. Upload both so `…/ota/latest.json` and the zip are publicly reachable.
+
+Native changes (new plugin, permission, icon, SDK bump) still require a Play Store release via `npm run android:bundle`.
+
+### Required backend setting
+
+Capacitor's WebView origin is `https://localhost`, so the FastAPI backend's `ALLOWED_ORIGINS` **must include `https://localhost`** (CORS) or all API calls from the app fail. Add it alongside the existing web origins.
+
 ## Key Decisions & Notes
 
 - **HashRouter not BrowserRouter** — Electron's `file://` protocol breaks HTML5 history API. Always keep this as HashRouter.
