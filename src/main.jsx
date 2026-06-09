@@ -5,17 +5,18 @@ import { Toaster } from 'react-hot-toast'
 import toast from 'react-hot-toast'
 import { registerSW } from 'virtual:pwa-register'
 import { Capacitor } from '@capacitor/core'
-import { installAndroidPrinterBridge } from './native/printerBridge'
 import { initLiveUpdates } from './native/liveUpdate'
 import App from './App'
 import './index.css'
 
 if (Capacitor.isNativePlatform()) {
-  // Native Android app: install the silent ESC/POS printing bridge before
-  // React mounts, and use Capgo OTA for updates. The PWA service worker is
-  // intentionally NOT registered here — it would re-introduce stale-cache
-  // update problems and conflict with OTA bundle swapping.
-  installAndroidPrinterBridge()
+  // Native Android app. Printing is SEND-ONLY (same as the PWA): the phone just
+  // creates the order on the server, and the restaurant's PC (desktop app) prints
+  // the KOT via its poller. This works on mobile data and never double-prints.
+  // (The native direct-print path in ./native/printerBridge.js is intentionally
+  // left unwired — it's only for future phone-only restaurants with no PC.)
+  // The PWA service worker is NOT registered on native so it can't re-introduce
+  // stale-cache update problems or conflict with OTA bundle swapping.
   initLiveUpdates()
 } else {
   registerSW()

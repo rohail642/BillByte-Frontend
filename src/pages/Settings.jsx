@@ -95,8 +95,9 @@ export default function Settings() {
   const [billPrinter, setBillPrinter]     = useState({ name: '', type: 'network', ip: '', usbName: '' })
   const [savingPrinters, setSavingPrinters] = useState(false)
   const [systemPrinters, setSystemPrinters] = useState([])
-  const isAndroidApp = !!window.electronAPI?.isAndroid
-  const isDesktop    = !!window.electronAPI?.isElectron && !isAndroidApp
+  // USB printing + system-printer enumeration only exist in the desktop app.
+  // On the Android app and web, only network (WiFi) printers are offered.
+  const isDesktop = !!window.electronAPI?.isElectron
 
   function applyConfig(config) {
     if (config?.printers?.length)
@@ -918,7 +919,7 @@ export default function Settings() {
             <p className="text-xs text-muted">The printer at the billing counter that prints customer receipts.</p>
             <Card className="space-y-3">
               <div className="flex gap-1 p-0.5 bg-surface2 rounded-lg w-fit">
-                {(isAndroidApp ? ['network'] : ['network', 'usb']).map(t => (
+                {(isDesktop ? ['network', 'usb'] : ['network']).map(t => (
                   <button key={t}
                     onClick={() => setBillPrinter(p => ({ ...p, type: t }))}
                     className={clsx('px-3 py-1 rounded-md text-xs font-semibold transition-colors capitalize',

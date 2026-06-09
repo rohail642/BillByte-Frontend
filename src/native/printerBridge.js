@@ -1,12 +1,17 @@
-// Android (Capacitor) printing bridge.
+// Android (Capacitor) DIRECT-PRINT bridge — CURRENTLY NOT WIRED.
 //
-// Installs a window.electronAPI-compatible object so the existing call sites
-// (Send KOT, print bill) work unchanged on mobile. When a waiter/cashier sends
-// a KOT, it prints directly to the printer the OWNER configured — the config is
-// read from the backend (restaurant-wide, shared to every device), so a waiter's
-// phone prints to the same printer without configuring anything locally.
+// The app runs in SEND-ONLY mode (see src/main.jsx): the phone creates the order
+// on the server and the restaurant's PC (desktop app) prints the KOT via its
+// poller. That works on mobile data and never double-prints, so this direct
+// phone→printer path is intentionally left unused.
 //
-// Printing goes out as raw ESC/POS bytes over TCP to a WiFi thermal printer at
+// Keep this for a future "phone-only restaurant" mode (no PC on site). To enable
+// it, call installAndroidPrinterBridge() in main.jsx — but only where there is no
+// PC gateway, otherwise the same KOT prints twice (phone + PC).
+//
+// When wired, it installs a window.electronAPI-compatible object so the existing
+// Send KOT / print bill call sites work unchanged, reading the owner's config
+// from the backend and writing raw ESC/POS bytes over TCP to a WiFi printer at
 // ip:9100 via the native EscPosPrinter plugin — no print dialog.
 
 import { Capacitor, registerPlugin } from '@capacitor/core'
