@@ -21,6 +21,11 @@ npm run electron:build
 
 # Web-only production build
 npm run build
+
+# RELEASE EVERYWHERE (web + Android OTA + Electron) — run on clean main
+# needs GH_TOKEN for the Electron channel, or add --no-electron
+# add --apk to also produce a signed sideload APK
+npm run release -- 1.1.22
 ```
 
 ## Tech Stack

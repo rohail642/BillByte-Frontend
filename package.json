@@ -16,7 +16,8 @@
     "android:open": "vite build && cap sync android && cap open android",
     "android:apk": "vite build && cap sync android && cd android && gradlew.bat assembleRelease",
     "android:bundle": "vite build && cap sync android && cd android && gradlew.bat bundleRelease",
-    "ota:zip": "node scripts/make-ota-bundle.mjs"
+    "ota:zip": "node scripts/make-ota-bundle.mjs",
+    "release": "node scripts/release-all.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^6.0.3",
