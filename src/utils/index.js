@@ -31,6 +31,11 @@ export const AVATAR_COLORS = [
 ]
 export const avatarColor = (i) => AVATAR_COLORS[i % AVATAR_COLORS.length]
 
+// True inside the Capacitor Android app — phones are order terminals,
+// the PC gateway prints, so KOT preview modals are skipped on native.
+export const isNativeApp = () =>
+  typeof window !== 'undefined' && !!window.Capacitor?.isNativePlatform?.()
+
 // Electron-only: silent TCP print to configured thermal printers
 export function printKOTElectron(kotData) {
   if (window.electronAPI?.printKOT) {

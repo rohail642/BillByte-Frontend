@@ -12,8 +12,8 @@
 // IMPORTANT: bump "version" in package.json before each OTA release, otherwise
 // apps already on that version will skip the update.
 
-import { execSync } from 'node:child_process'
-import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, writeFileSync, existsSync, rmSync, readdirSync } from 'node:fs'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -35,8 +35,11 @@ const zipPath = resolve(outDir, zipName)
 if (existsSync(zipPath)) rmSync(zipPath)
 
 // Zip the CONTENTS of dist/ so index.html sits at the zip root (what Capgo expects).
-const psCmd = `Compress-Archive -Path '${distDir}\\*' -DestinationPath '${zipPath}' -Force`
-execSync(`powershell -NoProfile -Command "${psCmd}"`, { stdio: 'inherit' })
+// Use bsdtar (ships with Windows 10+), NOT Compress-Archive: Compress-Archive writes
+// backslash entry names, which Android's unzipper treats as literal characters —
+// the extracted bundle has no assets/ dir and the app white-screens.
+const entries = readdirSync(distDir)
+execFileSync('tar', ['-a', '-cf', zipPath, '-C', distDir, ...entries], { stdio: 'inherit' })
 
 const baseUrl = (process.env.OTA_BASE_URL || 'https://app.billbyte.co.in/ota').replace(/\/$/, '')
 const manifest = { version, url: `${baseUrl}/${zipName}` }

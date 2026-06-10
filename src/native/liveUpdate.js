@@ -53,8 +53,11 @@ async function checkForUpdate(CapacitorUpdater) {
     const manifest = await res.json()
     if (!manifest?.version || !manifest?.url) return
 
+    // Capgo reports the APK's own bundle as "builtin" — in that case the real
+    // version is the one baked into this build at compile time.
     const current = await CapacitorUpdater.current()
-    const currentVersion = current?.bundle?.version
+    let currentVersion = current?.bundle?.version
+    if (!currentVersion || currentVersion === 'builtin') currentVersion = __APP_VERSION__
 
     if (manifest.version === currentVersion) return // already up to date
 
