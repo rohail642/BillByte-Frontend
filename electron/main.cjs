@@ -395,6 +395,43 @@ const DIRECT_PRINT_TTL     = 30_000
 const KOT_PERSIST_TTL      = 24 * 60 * 60 * 1000  // keep for 24 h
 let   _startSeq            = 0
 
+// ── Printer config: backend is source of truth, local file is offline cache ────
+// The owner configures printers once (from any device); the backend stores it
+// and this PC reads it. Falls back to the local file for legacy setups or when
+// the backend is unreachable, so printing never stops working offline.
+const CONFIG_TTL = 10_000
+let _cfgCache   = null
+let _cfgCacheTs = 0
+
+async function _fetchBackendConfig() {
+  if (!_authToken) return null
+  try {
+    const res = await fetch(`${API_BASE}/auth/printer-config`, {
+      headers: { Authorization: `Bearer ${_authToken}` },
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+async function getEffectiveConfig() {
+  if (_cfgCache && Date.now() - _cfgCacheTs < CONFIG_TTL) return _cfgCache
+  const backend = await _fetchBackendConfig()
+  const backendHasPrinters = backend && Array.isArray(backend.printers) && backend.printers.length > 0
+  let cfg
+  if (backendHasPrinters) {
+    cfg = backend
+    try { writePrinterConfig(backend) } catch {}   // refresh local offline cache
+  } else {
+    cfg = readPrinterConfig()                       // legacy / offline / not yet set on server
+  }
+  _cfgCache = cfg
+  _cfgCacheTs = Date.now()
+  return cfg
+}
+
 // ── Menu category map (for routing KOT items to specific printers) ────────────
 let _menuMap   = null      // { byId: Map<itemId, catId>, byName: Map<lowerName, catId> }
 let _menuMapTs = 0
@@ -502,7 +539,7 @@ async function _initPrintedKots() {
 
 async function _pollKOTs() {
   if (!_authToken || !_kotInitialized) return
-  const config   = readPrinterConfig()
+  const config   = await getEffectiveConfig()
   const printers = (config.printers || []).filter(hasValidTarget)
   if (!printers.length) return
 
@@ -585,11 +622,12 @@ ipcMain.handle('get-printer-config', () => readPrinterConfig())
 
 ipcMain.handle('save-printer-config', (_, config) => {
   writePrinterConfig(config)
+  _cfgCache = null  // backend just changed — force a re-read on next print/poll
   return { ok: true }
 })
 
 ipcMain.on('print-kot', async (_, kotData) => {
-  const config   = readPrinterConfig()
+  const config   = await getEffectiveConfig()
   const printers = (config.printers || []).filter(hasValidTarget)
   if (!printers.length) return
   if (kotData.orderId) _recentDirectPrints.set(String(kotData.orderId), Date.now())
@@ -605,10 +643,10 @@ ipcMain.on('print-kot', async (_, kotData) => {
   }
 })
 
-ipcMain.on('print-bill', (_, billData) => {
+ipcMain.on('print-bill', async (_, billData) => {
   const orderId = billData?.order?.id
   if (orderId) _recentDirectPrints.set(String(orderId), Date.now())
-  const config      = readPrinterConfig()
+  const config      = await getEffectiveConfig()
   const billPrinter = config.billPrinter
   if (!billPrinter || !hasValidTarget(billPrinter)) return
   printBillData(billPrinter, billData).catch(err =>

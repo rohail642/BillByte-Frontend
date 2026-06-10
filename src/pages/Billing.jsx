@@ -13,7 +13,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { Plus, Minus, Trash2, Receipt, CreditCard, UtensilsCrossed, Send, Printer, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { formatINR, printKOTElectron } from '../utils'
+import { formatINR, printKOTElectron, isNativeApp } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 import { clsx } from 'clsx'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
@@ -182,7 +182,7 @@ export default function Billing() {
         const didElectronPrint = printKOTElectron(kotData)
         if (didElectronPrint) {
           navigate('/')
-        } else {
+        } else if (!isNativeApp()) {
           setKotModal(kotData)
         }
       }

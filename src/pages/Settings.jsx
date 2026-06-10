@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProfile, updateProfile, changePassword } from '../api/auth'
 import { getCategories } from '../api/menu'
+import { getPrinterConfig, savePrinterConfig } from '../api/printers'
 import { API_URL } from '../api/client'
 import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
 import { useAuthStore } from '../store/auth'
@@ -94,25 +95,42 @@ export default function Settings() {
   const [billPrinter, setBillPrinter]     = useState({ name: '', type: 'network', ip: '', usbName: '' })
   const [savingPrinters, setSavingPrinters] = useState(false)
   const [systemPrinters, setSystemPrinters] = useState([])
+  // USB printing + system-printer enumeration only exist in the desktop app.
+  // On the Android app and web, only network (WiFi) printers are offered.
+  const isDesktop = !!window.electronAPI?.isElectron
+
+  function applyConfig(config) {
+    if (config?.printers?.length)
+      setPrinters(config.printers.map(p => ({ name: p.name || '', type: p.type || 'network', ip: p.ip || '', usbName: p.usbName || '', categories: Array.isArray(p.categories) ? p.categories : [] })))
+    if (config?.billPrinter) {
+      const bp = config.billPrinter
+      setBillPrinter({ name: bp.name || '', type: bp.type || 'network', ip: bp.ip || '', usbName: bp.usbName || '' })
+    }
+  }
 
   useEffect(() => {
-    if (!window.electronAPI?.getPrinterConfig) return
-    window.electronAPI.getPrinterConfig().then(config => {
-      if (config?.printers?.length)
-        setPrinters(config.printers.map(p => ({ name: p.name || '', type: p.type || 'network', ip: p.ip || '', usbName: p.usbName || '', categories: Array.isArray(p.categories) ? p.categories : [] })))
-      if (config?.billPrinter) {
-        const bp = config.billPrinter
-        setBillPrinter({ name: bp.name || '', type: bp.type || 'network', ip: bp.ip || '', usbName: bp.usbName || '' })
-      }
-    })
-    window.electronAPI.getSystemPrinters?.().then(names => setSystemPrinters(names || []))
-  }, [])
+    // Source of truth is the backend (shared to every device). On desktop, fall
+    // back to the local Electron config if the server has nothing yet (one-time
+    // migration — the next save populates the backend).
+    getPrinterConfig()
+      .then(async (config) => {
+        if (!config?.printers?.length && isDesktop && window.electronAPI?.getPrinterConfig) {
+          const local = await window.electronAPI.getPrinterConfig().catch(() => null)
+          if (local?.printers?.length) return applyConfig(local)
+        }
+        applyConfig(config)
+      })
+      .catch(() => {})
+    if (isDesktop) window.electronAPI.getSystemPrinters?.().then(names => setSystemPrinters(names || []))
+  }, [isDesktop])
 
   async function savePrinters() {
-    if (!window.electronAPI?.savePrinterConfig) return
     setSavingPrinters(true)
     try {
-      await window.electronAPI.savePrinterConfig({ printers, billPrinter })
+      const config = { printers, billPrinter }
+      await savePrinterConfig(config)               // server = source of truth (all devices)
+      window.electronAPI?.savePrinterConfig?.(config)  // desktop: keep local cache + poller in sync
+      window.electronAPI?.refreshPrinterConfig?.()     // mobile: drop cached config so next print refetches
       toast.success('Printer settings saved!')
     } catch {
       toast.error('Failed to save printer settings')
@@ -126,11 +144,10 @@ export default function Settings() {
     queryFn: getProfile,
   })
 
-  // Menu categories for KOT printer routing (desktop only)
+  // Menu categories for KOT printer routing (owner configures on any platform)
   const { data: menuCategories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
-    enabled: !!window.electronAPI?.isElectron,
   })
 
   const togglePrinterCategory = (i, catId) =>
@@ -817,13 +834,9 @@ export default function Settings() {
     printers: (
       <div className="space-y-4">
         <h3 className="font-display font-bold text-sm text-text">KOT Printers</h3>
-        {!window.electronAPI?.isElectron ? (
-          <Card>
-            <p className="text-sm text-muted text-center py-6">KOT printer configuration is only available in the desktop app.</p>
-          </Card>
-        ) : (
+        {(
           <>
-            <p className="text-xs text-muted">Add up to 3 thermal printers for KOT. Assign menu categories to route items — e.g. drinks to a bar printer, food to the kitchen. A printer with no categories selected prints everything else.</p>
+            <p className="text-xs text-muted">Add up to 3 thermal printers for KOT. Assign menu categories to route items — e.g. drinks to a bar printer, food to the kitchen. A printer with no categories selected prints everything else. This setup is saved to your account and used by <b>all devices</b> — phones and tablets included.</p>
             <div className="space-y-3">
               {printers.map((printer, i) => (
                 <Card key={i} className="space-y-3">
@@ -837,7 +850,7 @@ export default function Settings() {
                     )}
                   </div>
                   <div className="flex gap-1 p-0.5 bg-surface2 rounded-lg w-fit">
-                    {['network', 'usb'].map(t => (
+                    {(isDesktop ? ['network', 'usb'] : ['network']).map(t => (
                       <button key={t}
                         onClick={() => setPrinters(p => p.map((pr, j) => j === i ? { ...pr, type: t } : pr))}
                         className={clsx('px-3 py-1 rounded-md text-xs font-semibold transition-colors capitalize',
@@ -906,7 +919,7 @@ export default function Settings() {
             <p className="text-xs text-muted">The printer at the billing counter that prints customer receipts.</p>
             <Card className="space-y-3">
               <div className="flex gap-1 p-0.5 bg-surface2 rounded-lg w-fit">
-                {['network', 'usb'].map(t => (
+                {(isDesktop ? ['network', 'usb'] : ['network']).map(t => (
                   <button key={t}
                     onClick={() => setBillPrinter(p => ({ ...p, type: t }))}
                     className={clsx('px-3 py-1 rounded-md text-xs font-semibold transition-colors capitalize',

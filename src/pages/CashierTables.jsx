@@ -7,7 +7,7 @@ import { lookupCustomer } from '../api/customers'
 import toast from 'react-hot-toast'
 import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer, ArrowLeft } from 'lucide-react'
 import { clsx } from 'clsx'
-import { formatINR, printKOTElectron } from '../utils'
+import { formatINR, printKOTElectron, isNativeApp } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 import Modal from '../components/ui/Modal'
@@ -127,7 +127,7 @@ export default function CashierTables() {
         notes:          note || '',
         orderId,
       }
-      if (!printKOTElectron(kotData)) setKotModal(kotData)
+      if (!printKOTElectron(kotData) && !isNativeApp()) setKotModal(kotData)
       setCart([])
       setNote('')
       qc.removeQueries({ queryKey: ['tableOrder', selectedTable] })

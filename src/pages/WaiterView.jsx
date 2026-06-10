@@ -17,7 +17,7 @@ const SECTION_COLORS = {
   gray:   '#78716c',
 }
 import { clsx } from 'clsx'
-import { formatINR, printKOTElectron } from '../utils'
+import { formatINR, printKOTElectron, isNativeApp } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 
 export default function WaiterView() {
@@ -94,7 +94,7 @@ export default function WaiterView() {
         notes:          note || '',
         orderId,
       }
-      if (!printKOTElectron(kotData)) setKotModal(kotData)
+      if (!printKOTElectron(kotData) && !isNativeApp()) setKotModal(kotData)
       setCart([])
       setNote('')
       setSelectedTable(null)

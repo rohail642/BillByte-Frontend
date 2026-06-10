@@ -1,7 +1,7 @@
 {
   "name": "billbyte-react",
   "private": true,
-  "version": "1.1.19",
+  "version": "1.1.21",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -11,9 +11,18 @@
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:3000 && electron .\"",
     "electron:build": "vite build && electron-builder",
-    "electron:publish": "vite build && electron-builder --publish always"
+    "electron:publish": "vite build && electron-builder --publish always",
+    "android:sync": "vite build && cap sync android",
+    "android:open": "vite build && cap sync android && cap open android",
+    "android:apk": "vite build && cap sync android && cd android && gradlew.bat assembleRelease",
+    "android:bundle": "vite build && cap sync android && cd android && gradlew.bat bundleRelease",
+    "ota:zip": "node scripts/make-ota-bundle.mjs"
   },
   "dependencies": {
+    "@capacitor/app": "^6.0.3",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/preferences": "^6.0.4",
+    "@capgo/capacitor-updater": "^6.45.10",
     "@tanstack/react-query": "^5.96.2",
     "axios": "^1.14.0",
     "clsx": "^2.1.1",
@@ -27,10 +36,13 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
     "@eslint/js": "^9.39.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "astral-regex": "^2.0.0",
     "autoprefixer": "^10.4.27",
     "concurrently": "^9.1.2",
     "electron": "^34.0.0",
