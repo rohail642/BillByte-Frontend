@@ -9,9 +9,10 @@ import Badge from '../components/ui/Badge'
 import Modal from '../components/ui/Modal'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
-import { formatINR, statusColor } from '../utils'
-import { CreditCard, RefreshCw, X, ChevronDown, Printer } from 'lucide-react'
+import { formatINR, statusColor, printKOTElectron, isNativeApp } from '../utils'
+import { CreditCard, RefreshCw, X, ChevronDown, Printer, UtensilsCrossed } from 'lucide-react'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
+import { KOTModal } from '../components/ui/KOTView'
 
 const STATUS_LABELS = { pending:'Pending', kot_sent:'KOT Sent', preparing:'Preparing', ready:'Ready', served:'Served', paid:'Paid', cancelled:'Cancelled' }
 
@@ -30,6 +31,7 @@ export default function Orders() {
   const [payModal,     setPayModal]     = useState(null)
   const [receiptModal, setReceiptModal] = useState(null)
   const [expandedId,   setExpandedId]  = useState(null)
+  const [kotModal,     setKotModal]    = useState(null)
 
   const { data: orders, isLoading, refetch } = useQuery({
     queryKey: ['orders', statusFilter, typeFilter],
@@ -67,6 +69,21 @@ export default function Orders() {
     },
     onError: e => toast.error(String(e)),
   })
+
+  const reprintKot = (order) => {
+    const items = (order.items || []).filter(i => !i.cancelled_at)
+    if (!items.length) { toast.error('No items to reprint'); return }
+    const kotData = {
+      restaurantName: profile?.restaurant_name || 'Restaurant',
+      orderNumber: order.order_number,
+      tableNumber: order.table_number,
+      customerName: order.customer_name || '',
+      items: items.map(i => ({ name: i.name, quantity: i.quantity })),
+      notes: order.notes || '',
+    }
+    if (!printKOTElectron(kotData) && !isNativeApp()) setKotModal(kotData)
+    else toast.success('KOT sent to printer')
+  }
 
   const counts = (orders || []).reduce((acc, o) => { acc[o.status] = (acc[o.status] || 0) + 1; return acc }, {})
 
@@ -144,6 +161,14 @@ export default function Orders() {
                 <p className="font-display font-black text-base text-text">{formatINR(order.total_amount)}</p>
 
                 <div className="flex gap-1.5 flex-shrink-0">
+                  {/* Reprint KOT */}
+                  {(order.items || []).some(i => !i.cancelled_at) && order.status !== 'pending' && order.status !== 'cancelled' && (
+                    <Button variant="secondary" size="xs" icon={<UtensilsCrossed size={11}/>}
+                      onClick={() => reprintKot(order)}>
+                      KOT
+                    </Button>
+                  )}
+
                   {/* Print receipt */}
                   <Button variant="secondary" size="xs" icon={<Printer size={11}/>}
                     onClick={() => setReceiptModal(order)}>
@@ -270,6 +295,9 @@ export default function Orders() {
           </div>
         )}
       </Modal>
+
+      {/* Reprint KOT modal (web fallback when Electron not available) */}
+      <KOTModal data={kotModal} onClose={() => setKotModal(null)} />
     </div>
   )
 }
