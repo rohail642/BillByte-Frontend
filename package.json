@@ -1,7 +1,7 @@
 {
   "name": "billbyte-react",
   "private": true,
-  "version": "1.1.21",
+  "version": "1.1.22",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
