@@ -74,6 +74,11 @@
       "target": "nsis",
       "icon": "build/icon.ico"
     },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "identity": null
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
