@@ -1,16 +1,17 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus, removeOrderItem, collectPayment } from '../api/orders'
+import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus, removeOrderItem, collectPayment, cancelOrderItem, retryCancelNotify } from '../api/orders'
 import { getMenuItems, getCategories } from '../api/menu'
 import { getProfile } from '../api/auth'
 import { lookupCustomer } from '../api/customers'
 import toast from 'react-hot-toast'
-import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer, ArrowLeft } from 'lucide-react'
+import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer, ArrowLeft, RefreshCw } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatINR, printKOTElectron, isNativeApp } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 import Modal from '../components/ui/Modal'
+import CancelItemModal from '../components/ui/CancelItemModal'
 
 const SECTION_COLORS = {
   blue:   '#3b82f6',
@@ -21,6 +22,10 @@ const SECTION_COLORS = {
   red:    '#dc2626',
   gray:   '#78716c',
 }
+
+// Paused: the deployed backend doesn't have the /orders/{id}/items/{id}/cancel
+// endpoint yet, so the flow fails with "Not Found". Flip to true after redeploying.
+const CANCEL_ITEM_ENABLED = false
 
 export default function CashierTables() {
   const qc = useQueryClient()
@@ -40,6 +45,8 @@ export default function CashierTables() {
   const [notFound, setNotFound] = useState(false)
   const [pointsApplied, setPointsApplied] = useState(false)
   const [note, setNote] = useState('')
+  const [cancelModal, setCancelModal] = useState(null)
+  const [cancelNotifyId, setCancelNotifyId] = useState(null)
 
   useEffect(() => {
     if (!customerPhone || customerPhone.length < 10) { setFoundCustomer(null); setNotFound(false); return }
@@ -83,7 +90,7 @@ export default function CashierTables() {
   })
 
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories })
-  const { data: menuData } = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ limit: 200 }) })
+  const { data: menuData } = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ limit: 200 }), refetchInterval: 30000 })
   const menuItems = useMemo(() => (menuData?.items || menuData || []).filter(i => i.is_available !== false), [menuData])
 
   const filteredItems = useMemo(() => {
@@ -94,13 +101,24 @@ export default function CashierTables() {
   }, [menuItems, activeCategory, search])
 
   const cancelItemMut = useMutation({
-    mutationFn: ({ orderId, itemId }) => removeOrderItem(orderId, itemId),
-    onSuccess: () => {
-      toast.success('Item cancelled — kitchen notified')
+    mutationFn: ({ orderId, itemId, body }) => cancelOrderItem(orderId, itemId, body),
+    onSuccess: (res) => {
+      setCancelModal(null)
+      toast.success(res?.message || 'Item cancelled')
       qc.invalidateQueries({ queryKey: ['tableOrder', selectedTable] })
       qc.invalidateQueries({ queryKey: ['activeTables'] })
     },
-    onError: e => toast.error(String(e?.response?.data?.detail || e?.message || 'Failed to cancel item')),
+    onError: e => {
+      toast.error(e || 'Failed to cancel item')
+    },
+  })
+
+  const retryNotifyMut = useMutation({
+    mutationFn: () => retryCancelNotify(activeTableOrder?.id, cancelModal?.id),
+    onSuccess: () => {
+      toast.success('Cancellation notice re-sent to station')
+    },
+    onError: e => toast.error(e || 'Failed to send notification'),
   })
 
   const sendMut = useMutation({
@@ -132,12 +150,11 @@ export default function CashierTables() {
       setNote('')
       qc.removeQueries({ queryKey: ['tableOrder', selectedTable] })
       qc.invalidateQueries({ queryKey: ['activeTables'] })
+      qc.invalidateQueries({ queryKey: ['menuItems'] })
       setSelectedTable(null)
     },
     onError: e => {
-      const msg = e?.response?.data?.detail
-      if (Array.isArray(msg)) toast.error(msg.map(m => m.msg).join(', '))
-      else toast.error(String(msg || e?.message || 'Something went wrong'))
+      toast.error(e || 'Something went wrong')
     },
   })
 
@@ -182,10 +199,14 @@ export default function CashierTables() {
       setCart([])
       toast.success(`Table ${selectedTable} billed successfully`)
     },
-    onError: (e) => toast.error(e?.response?.data?.detail || 'Payment failed'),
+    onError: (e) => toast.error(e || 'Payment failed'),
   })
 
   function addToCart(item) {
+    const tracked = item.stock_qty != null
+    if (tracked && item.stock_qty <= 0) { toast.error(`${item.name} is out of stock`); return }
+    const inCartQty = cart.find(c => c.id === item.id)?.qty || 0
+    if (tracked && inCartQty >= item.stock_qty) { toast.error(`Only ${item.stock_qty} left in stock`); return }
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id)
       if (existing) return prev.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c)
@@ -194,6 +215,11 @@ export default function CashierTables() {
   }
 
   function updateQty(id, delta) {
+    if (delta > 0) {
+      const mi = menuItems.find(m => m.id === id)
+      const cur = cart.find(c => c.id === id)?.qty || 0
+      if (mi?.stock_qty != null && cur >= mi.stock_qty) { toast.error(`Only ${mi.stock_qty} left in stock`); return }
+    }
     setCart(prev => prev
       .map(c => c.id === id ? { ...c, qty: c.qty + delta } : c)
       .filter(c => c.qty > 0)
@@ -201,8 +227,8 @@ export default function CashierTables() {
   }
 
   const cartTotal = cart.reduce((sum, c) => sum + c.price * c.qty, 0)
-  // Never show items from a paid/cancelled order even if the cache is stale
-  const activeTableOrder = (tableOrder && !['paid', 'cancelled'].includes(tableOrder.status)) ? tableOrder : null
+  // Never show items from a paid order even if the cache is stale
+  const activeTableOrder = (tableOrder && tableOrder.status !== 'paid') ? tableOrder : null
   const existingItems = activeTableOrder?.items || []
 
   // Each section owns custom-named tables (strings). Legacy fallback: numeric 1..table_count.
@@ -316,12 +342,14 @@ export default function CashierTables() {
                           <span className={clsx('text-text2 flex-1 truncate', isCancelled && 'line-through')}>{item.name}</span>
                           <span className="text-muted">×{item.quantity}</span>
                           <span className="text-text font-medium w-16 text-right">{formatINR(item.price * item.quantity)}</span>
-                          {!isCancelled && activeTableOrder?.id && (
+                          {CANCEL_ITEM_ENABLED && !isCancelled && activeTableOrder?.id && (
                             <button
                               onClick={() => {
-                                if (window.confirm(`Cancel "${item.name}"? Kitchen will be notified.`)) {
-                                  cancelItemMut.mutate({ orderId: activeTableOrder.id, itemId: item.id })
-                                }
+                                const kotStatuses = activeTableOrder?.kot_statuses || {}
+                                const kotNum = String(item.kot_number || 1)
+                                const kotStatus = kotStatuses[kotNum]
+                                const hasBeenFired = kotStatus && ['kot_sent', 'preparing', 'ready', 'served'].includes(kotStatus) && kotStatus !== 'served'
+                                setCancelModal({ ...item, requiresApproval: !!hasBeenFired, orderId: activeTableOrder.id })
                               }}
                               disabled={isCancelling}
                               className="ml-1 w-5 h-5 rounded flex items-center justify-center text-muted hover:text-red hover:bg-red-dim transition-colors flex-shrink-0"
@@ -430,6 +458,7 @@ export default function CashierTables() {
                   placeholder="Search menu…"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
+                  autoComplete="off"
                   className="w-full pl-8 pr-3 py-2 bg-bg2 border border-border rounded-lg text-sm text-text placeholder-muted focus:outline-none focus:border-green"
                 />
               </div>
@@ -465,13 +494,17 @@ export default function CashierTables() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                   {filteredItems.map(item => {
                     const inCart = cart.find(c => c.id === item.id)
+                    const tracked = item.stock_qty != null
+                    const outOfStock = tracked && item.stock_qty <= 0
                     return (
                       <button
                         key={item.id}
                         onClick={() => addToCart(item)}
                         className={clsx(
                           'p-3 rounded-xl border-2 text-left transition-all',
-                          inCart
+                          outOfStock
+                            ? 'border-border bg-bg2 opacity-45 cursor-not-allowed'
+                            : inCart
                             ? 'border-green bg-green-dim'
                             : 'border-border bg-bg2 hover:border-green/40 hover:bg-surface2'
                         )}
@@ -480,12 +513,18 @@ export default function CashierTables() {
                         <p className="text-xs text-muted mt-0.5">{item.category_name || item.category || ''}</p>
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-sm font-bold text-green">{formatINR(item.price)}</span>
-                          {inCart && (
+                          {inCart && !outOfStock && (
                             <span className="w-5 h-5 bg-green text-white rounded-full text-[10px] font-bold flex items-center justify-center">
                               {inCart.qty}
                             </span>
                           )}
                         </div>
+                        {tracked && (
+                          <p className={clsx('text-[10px] font-bold mt-1',
+                            outOfStock ? 'text-red' : item.stock_qty <= 5 ? 'text-amber' : 'text-muted')}>
+                            {outOfStock ? 'Out of stock' : `${item.stock_qty} left`}
+                          </p>
+                        )}
                       </button>
                     )
                   })}
@@ -612,6 +651,38 @@ export default function CashierTables() {
       </Modal>
 
       <KOTModal data={kotModal} onClose={() => setKotModal(null)} />
+
+      {/* Cancel Item Modal */}
+      <CancelItemModal
+        open={!!cancelModal}
+        onClose={() => setCancelModal(null)}
+        item={cancelModal}
+        requiresApproval={cancelModal?.requiresApproval ?? false}
+        isPending={cancelItemMut.isPending}
+        onConfirm={(cancelBody) => {
+          cancelItemMut.mutate({
+            orderId: cancelModal.orderId,
+            itemId: cancelModal.id,
+            body: cancelBody,
+          })
+        }}
+      />
+
+      {/* Station notification alert */}
+      {cancelNotifyId && (
+        <div className="fixed bottom-4 right-4 z-50 bg-orange border border-orange/30 rounded-xl px-4 py-3 shadow-lg max-w-xs">
+          <p className="text-xs font-semibold text-orange mb-1.5">⚠ Printer may be offline</p>
+          <p className="text-[10px] text-text2 mb-2">Please notify the kitchen station verbally as a fallback.</p>
+          <button
+            onClick={() => retryNotifyMut.mutate()}
+            disabled={retryNotifyMut.isPending}
+            className="flex items-center gap-1.5 text-[10px] font-bold text-orange hover:opacity-80 transition-opacity"
+          >
+            <RefreshCw size={11} />
+            {retryNotifyMut.isPending ? 'Re-sending...' : 'Retry notification'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

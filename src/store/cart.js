@@ -13,7 +13,12 @@ export const useCartStore = create((set, get) => ({
 
   addItem: (item) => set(s => {
     const ex = s.items.find(i => i.id === item.id)
-    if (ex) return { items: s.items.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i) }
+    if (ex) {
+      // stock == null means untracked; otherwise cap cart qty at available stock
+      if (ex.stock != null && ex.qty >= ex.stock) return s
+      return { items: s.items.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i) }
+    }
+    if (item.stock != null && item.stock <= 0) return s
     return { items: [...s.items, { ...item, qty: 1 }] }
   }),
   removeItem: (id) => set(s => ({

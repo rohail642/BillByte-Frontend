@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProfile, updateProfile, changePassword } from '../api/auth'
+import { getProfile, updateProfile, changePassword, setManagerPin } from '../api/auth'
 import { getCategories } from '../api/menu'
 import { getPrinterConfig, savePrinterConfig } from '../api/printers'
 import { API_URL } from '../api/client'
 import { getTeam, addTeamMember, updateTeamMember, removeTeamMember } from '../api/team'
+import { getTelegramStatus, createTelegramLinkToken, toggleTelegram, unlinkTelegram, sendTelegramReportNow } from '../api/telegram'
 import { useAuthStore } from '../store/auth'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -343,7 +344,7 @@ export default function Settings() {
   const addMut = useMutation({
     mutationFn: addTeamMember,
     onSuccess: () => { toast.success('Team member added!'); refetchTeam(); setTeamModal(false); setTeamForm({}) },
-    onError: e => toast.error(e?.response?.data?.detail || String(e)),
+    onError: e => toast.error(e),
   })
 
   const updateMut = useMutation({
@@ -358,7 +359,52 @@ export default function Settings() {
     onError: e => toast.error(String(e)),
   })
 
+  // Telegram daily reports
+  const [tgLink, setTgLink] = useState(null) // outstanding link token { deep_link, token, expires_at }
+  const { data: tgStatus, refetch: refetchTg } = useQuery({
+    queryKey: ['telegramStatus'],
+    queryFn: getTelegramStatus,
+    enabled: isOwner,
+    // While a link token is outstanding, poll so the card flips to "linked"
+    // the moment the user taps Start in Telegram.
+    refetchInterval: tgLink ? 4000 : false,
+  })
+  useEffect(() => {
+    if (tgLink && tgStatus?.linked) { setTgLink(null); toast.success('Telegram connected!') }
+  }, [tgLink, tgStatus?.linked])
+
+  const tgConnectMut = useMutation({
+    mutationFn: createTelegramLinkToken,
+    onSuccess: (res) => {
+      setTgLink(res)
+      if (res.deep_link) window.open(res.deep_link, '_blank', 'noopener')
+    },
+    onError: e => toast.error(String(e)),
+  })
+  const tgToggleMut = useMutation({
+    mutationFn: toggleTelegram,
+    onSuccess: () => refetchTg(),
+    onError: e => toast.error(String(e)),
+  })
+  const tgUnlinkMut = useMutation({
+    mutationFn: unlinkTelegram,
+    onSuccess: () => { setTgLink(null); refetchTg(); toast.success('Telegram disconnected') },
+    onError: e => toast.error(String(e)),
+  })
+  const tgTestMut = useMutation({
+    mutationFn: sendTelegramReportNow,
+    onSuccess: () => { toast.success('Report sent — check Telegram 📬'); refetchTg() },
+    onError: e => { toast.error(String(e)); refetchTg() },
+  })
+  const tgTime = tgStatus
+    ? `${String(tgStatus.send_hour).padStart(2, '0')}:${String(tgStatus.send_minute).padStart(2, '0')}`
+    : '23:00'
+
   // Change password
+  // Manager PIN state
+  const [mpinForm, setMpinForm] = useState({ current: '', newPin: '', confirm: '' })
+  const [mpinSaving, setMpinSaving] = useState(false)
+
   const [pwForm, setPwForm]   = useState({ current: '', next: '', confirm: '' })
   const [pwSaving, setPwSaving] = useState(false)
   const setPW = (k, v) => setPwForm(f => ({ ...f, [k]: v }))
@@ -423,6 +469,79 @@ export default function Settings() {
       <div className="space-y-4">
         <h3 className="font-display font-bold text-sm text-text">Integrations</h3>
         <p className="text-xs text-muted">Configure your delivery platform integrations. Each restaurant gets a unique webhook URL.</p>
+
+        {/* Telegram daily reports */}
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📊</span>
+              <div>
+                <p className="text-sm font-bold text-text">Telegram Daily Reports</p>
+                <p className="text-xs text-muted">Sales summary on Telegram every night at {tgTime} ({tgStatus?.timezone || 'IST'})</p>
+              </div>
+            </div>
+            {tgStatus?.linked && (
+              <button
+                role="switch" aria-checked={tgStatus.enabled}
+                onClick={() => tgToggleMut.mutate(!tgStatus.enabled)}
+                disabled={tgToggleMut.isPending}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${tgStatus.enabled ? 'bg-green' : 'bg-border2'}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${tgStatus.enabled ? 'left-4' : 'left-0.5'}`} />
+              </button>
+            )}
+          </div>
+
+          {tgStatus && !tgStatus.configured ? (
+            <p className="text-xs text-muted pt-2 border-t border-border">
+              Not configured on the server yet — set <code className="text-orange">TELEGRAM_BOT_TOKEN</code> on the backend to enable this.
+            </p>
+          ) : tgStatus?.linked ? (
+            <div className="pt-2 border-t border-border space-y-2">
+              <p className="text-xs text-text2">
+                Connected{tgStatus.telegram_username ? <> as <span className="font-bold">@{tgStatus.telegram_username}</span></> : ''}
+                {tgStatus.last_report_sent_at && (
+                  <span className="text-muted"> · last report {new Date(tgStatus.last_report_sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                )}
+              </p>
+              {tgStatus.last_delivery_status && tgStatus.last_delivery_status !== 'sent' && (
+                <p className="text-[10px] text-red font-semibold">Last delivery failed: {tgStatus.last_delivery_status}</p>
+              )}
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" loading={tgTestMut.isPending} onClick={() => tgTestMut.mutate()}>
+                  Send test report
+                </Button>
+                <Button variant="danger" size="sm" loading={tgUnlinkMut.isPending}
+                  onClick={() => { if (confirm('Disconnect Telegram? Daily reports will stop.')) tgUnlinkMut.mutate() }}>
+                  Disconnect
+                </Button>
+              </div>
+            </div>
+          ) : tgLink ? (
+            <div className="pt-2 border-t border-border space-y-2">
+              <p className="text-xs text-text2">
+                {tgLink.deep_link
+                  ? <>Tap the button below, then press <b>Start</b> in Telegram. This card updates automatically.</>
+                  : <>Open your bot in Telegram and send it this message:</>}
+              </p>
+              {tgLink.deep_link ? (
+                <a href={tgLink.deep_link} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 bg-blue-dim text-blue text-xs font-bold px-3 py-2 rounded-lg hover:opacity-80 transition-opacity">
+                  Open Telegram → Connect
+                </a>
+              ) : (
+                <code className="block bg-surface2 rounded-lg p-2.5 text-xs text-green2 break-all">/start {tgLink.token}</code>
+              )}
+              <p className="text-[10px] text-muted">Link expires in 15 minutes. <button className="underline" onClick={() => tgConnectMut.mutate()}>Generate a new one</button></p>
+            </div>
+          ) : (
+            <div className="pt-2 border-t border-border">
+              <Button variant="secondary" size="sm" loading={tgConnectMut.isPending} onClick={() => tgConnectMut.mutate()}>
+                Connect Telegram
+              </Button>
+            </div>
+          )}
+        </Card>
 
         {/* Zomato */}
         <Card className="space-y-3">
@@ -1103,6 +1222,49 @@ export default function Settings() {
             </Button>
           </div>
         </Card>
+
+        {/* Manager PIN */}
+        {isOwner && (
+          <Card className="space-y-3">
+            <div className="flex items-start gap-2">
+              <KeyRound size={16} className="text-amber mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-text">Manager PIN</p>
+                <p className="text-xs text-muted">
+                  A shared PIN that managers enter to authorise sensitive actions like cancelling
+                  items that have already been sent to the kitchen.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Input label="Current PIN (leave blank if setting for the first time)" type="password"
+                placeholder="Enter current PIN to change it"
+                value={mpinForm.current} onChange={e => setMpinForm(f => ({ ...f, current: e.target.value }))} />
+              <Input label="New Manager PIN" type="password" placeholder="Set a 4-20 digit PIN"
+                value={mpinForm.newPin} onChange={e => setMpinForm(f => ({ ...f, newPin: e.target.value }))} />
+              <Input label="Confirm New PIN" type="password" placeholder="Re-enter new PIN"
+                value={mpinForm.confirm} onChange={e => setMpinForm(f => ({ ...f, confirm: e.target.value }))} />
+              <Button variant="primary" size="sm" loading={mpinSaving}
+                onClick={async () => {
+                  if (!mpinForm.newPin || mpinForm.newPin.length < 4) { toast.error('PIN must be at least 4 characters'); return }
+                  if (mpinForm.newPin !== mpinForm.confirm) { toast.error('PINs do not match'); return }
+                  setMpinSaving(true)
+                  try {
+                    await setManagerPin({
+                      current_pin: mpinForm.current || null,
+                      new_pin: mpinForm.newPin,
+                    })
+                    toast.success('Manager PIN updated!')
+                    setMpinForm({ current: '', newPin: '', confirm: '' })
+                  } catch (e) { toast.error(e) }
+                  finally { setMpinSaving(false) }
+                }}>
+                Save Manager PIN
+              </Button>
+            </div>
+          </Card>
+        )}
       </div>
     ),
   }

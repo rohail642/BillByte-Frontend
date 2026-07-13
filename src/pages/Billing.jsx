@@ -57,7 +57,7 @@ export default function Billing() {
   const total    = cart.getTotal()
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: getCategories })
-  const { data: menuItems }  = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ active_only: true }) })
+  const { data: menuItems }  = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ active_only: true }), refetchInterval: 30000 })
   const { data: profile }    = useQuery({ queryKey: ['profile'],   queryFn: getProfile })
   const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 10000 })
 
@@ -167,6 +167,7 @@ export default function Billing() {
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['orders', 'live'] })
       qc.invalidateQueries({ queryKey: ['summary'] })
+      qc.invalidateQueries({ queryKey: ['menuItems'] })
       if (order.payment_method) {
         qc.invalidateQueries({ queryKey: ['inventory'] })
         qc.invalidateQueries({ queryKey: ['alerts'] })
@@ -293,15 +294,33 @@ export default function Billing() {
 
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5">
-            {filtered.map(item => (
-              <button key={item.id}
-                onClick={() => cart.addItem({ id: item.id, name: item.name, price: item.price, emoji: item.emoji, cat: item.category_id })}
-                className="bg-surface2 border border-border rounded-xl p-3 text-center hover:border-green/40 hover:bg-green-dim hover:shadow-sm transition-all active:scale-95 cursor-pointer">
-                <div className="text-2xl mb-1.5">{item.emoji}</div>
-                <p className="text-xs font-semibold text-text leading-tight mb-0.5">{item.name}</p>
-                <p className="text-xs font-bold text-green2">₹{item.price}</p>
-              </button>
-            ))}
+            {filtered.map(item => {
+              const tracked  = item.stock_qty != null
+              const outOfStock = tracked && item.stock_qty <= 0
+              const inCartQty  = cart.items.find(i => i.id === item.id)?.qty || 0
+              return (
+                <button key={item.id}
+                  onClick={() => {
+                    if (outOfStock) { toast.error(`${item.name} is out of stock`); return }
+                    if (tracked && inCartQty >= item.stock_qty) { toast.error(`Only ${item.stock_qty} left in stock`); return }
+                    cart.addItem({ id: item.id, name: item.name, price: item.price, emoji: item.emoji, cat: item.category_id, stock: item.stock_qty })
+                  }}
+                  className={clsx('bg-surface2 border border-border rounded-xl p-3 text-center transition-all',
+                    outOfStock
+                      ? 'opacity-45 cursor-not-allowed'
+                      : 'hover:border-green/40 hover:bg-green-dim hover:shadow-sm active:scale-95 cursor-pointer')}>
+                  <div className="text-2xl mb-1.5">{item.emoji}</div>
+                  <p className="text-xs font-semibold text-text leading-tight mb-0.5">{item.name}</p>
+                  <p className="text-xs font-bold text-green2">₹{item.price}</p>
+                  {tracked && (
+                    <p className={clsx('text-[10px] font-bold mt-0.5',
+                      outOfStock ? 'text-red' : item.stock_qty <= 5 ? 'text-amber' : 'text-muted')}>
+                      {outOfStock ? 'Out of stock' : `${item.stock_qty} left`}
+                    </p>
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>

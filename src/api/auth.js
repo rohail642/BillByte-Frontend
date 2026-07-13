@@ -8,3 +8,6 @@ export const updateProfile = (body) => client.patch('/auth/profile', body)
 
 // Change password (verifies current password)
 export const changePassword  = (body) => client.post('/auth/change-password', body)
+
+// Manager PIN
+export const setManagerPin   = (body) => client.put('/auth/manager-pin', body)

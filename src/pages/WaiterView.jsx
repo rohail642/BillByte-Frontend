@@ -6,6 +6,8 @@ import { getProfile } from '../api/auth'
 import { useAuthStore } from '../store/auth'
 import toast from 'react-hot-toast'
 import { LogOut, X, Plus, Minus, Search, ChefHat, UtensilsCrossed, ArrowLeft } from 'lucide-react'
+import { cancelOrderItem } from '../api/orders'
+import CancelItemModal from '../components/ui/CancelItemModal'
 
 const SECTION_COLORS = {
   blue:   '#3b82f6',
@@ -34,6 +36,7 @@ export default function WaiterView() {
   const [cart, setCart] = useState([])
   const [note, setNote] = useState('')
   const [kotModal, setKotModal] = useState(null)
+  const [cancelModal, setCancelModal] = useState(null)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [mobileTab, setMobileTab] = useState('menu')
@@ -60,7 +63,7 @@ export default function WaiterView() {
   })
 
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories })
-  const { data: menuData } = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ limit: 200 }) })
+  const { data: menuData } = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ limit: 200 }), refetchInterval: 30000 })
   const menuItems = useMemo(() => (menuData?.items || menuData || []).filter(i => i.is_available !== false), [menuData])
 
   const filteredItems = useMemo(() => {
@@ -100,15 +103,18 @@ export default function WaiterView() {
       setSelectedTable(null)
       qc.invalidateQueries({ queryKey: ['activeTables'] })
       qc.invalidateQueries({ queryKey: ['tableOrder', selectedTable] })
+      qc.invalidateQueries({ queryKey: ['menuItems'] })
     },
     onError: e => {
-      const msg = e?.response?.data?.detail
-      if (Array.isArray(msg)) toast.error(msg.map(m => m.msg).join(', '))
-      else toast.error(String(msg || e?.message || 'Something went wrong'))
+      toast.error(e || 'Something went wrong')
     },
   })
 
   function addToCart(item) {
+    const tracked = item.stock_qty != null
+    if (tracked && item.stock_qty <= 0) { toast.error(`${item.name} is out of stock`); return }
+    const inCartQty = cart.find(c => c.id === item.id)?.qty || 0
+    if (tracked && inCartQty >= item.stock_qty) { toast.error(`Only ${item.stock_qty} left in stock`); return }
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id)
       if (existing) return prev.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c)
@@ -117,11 +123,29 @@ export default function WaiterView() {
   }
 
   function updateQty(id, delta) {
+    if (delta > 0) {
+      const mi = menuItems.find(m => m.id === id)
+      const cur = cart.find(c => c.id === id)?.qty || 0
+      if (mi?.stock_qty != null && cur >= mi.stock_qty) { toast.error(`Only ${mi.stock_qty} left in stock`); return }
+    }
     setCart(prev => prev
       .map(c => c.id === id ? { ...c, qty: c.qty + delta } : c)
       .filter(c => c.qty > 0)
     )
   }
+
+  const cancelItemMut = useMutation({
+    mutationFn: ({ orderId, itemId, body }) => cancelOrderItem(orderId, itemId, body),
+    onSuccess: (res) => {
+      setCancelModal(null)
+      toast.success(res?.message || 'Item cancelled')
+      qc.invalidateQueries({ queryKey: ['tableOrder', selectedTable] })
+      qc.invalidateQueries({ queryKey: ['activeTables'] })
+    },
+    onError: e => {
+      toast.error(e || 'Failed to cancel item')
+    },
+  })
 
   const cartTotal = cart.reduce((sum, c) => sum + c.price * c.qty, 0)
   const existingItems = tableOrder?.items || []
@@ -256,13 +280,36 @@ export default function WaiterView() {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">Current Order</p>
                   <div className="space-y-1">
-                    {existingItems.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between text-sm py-1">
-                        <span className="text-text2 flex-1 truncate">{item.name}</span>
-                        <span className="text-muted mx-2">×{item.quantity}</span>
-                        <span className="text-text font-medium">{formatINR(item.price * item.quantity)}</span>
-                      </div>
-                    ))}
+                    {existingItems.map((item, i) => {
+                      const isCancelled = !!item.cancelled_at
+                      const isCancelling = cancelItemMut.isPending && cancelItemMut.variables?.itemId === item.id
+                      return (
+                        <div key={item.id || i} className={clsx('flex items-center gap-1 text-sm py-1', isCancelled && 'opacity-40')}>
+                          <span className={clsx('text-text2 flex-1 truncate', isCancelled && 'line-through')}>{item.name}</span>
+                          <span className="text-muted">×{item.quantity}</span>
+                          <span className="text-text font-medium w-16 text-right">{formatINR(item.price * item.quantity)}</span>
+                          {!isCancelled && tableOrder?.id && (
+                            <button
+                              onClick={() => {
+                                const kotStatuses = tableOrder?.kot_statuses || {}
+                                const kotNum = String(item.kot_number || 1)
+                                const kotStatus = kotStatuses[kotNum]
+                                const hasBeenFired = kotStatus && ['kot_sent', 'preparing', 'ready', 'served'].includes(kotStatus) && kotStatus !== 'served'
+                                setCancelModal({ ...item, requiresApproval: !!hasBeenFired, orderId: tableOrder.id })
+                              }}
+                              disabled={isCancelling}
+                              className="ml-1 w-5 h-5 rounded flex items-center justify-center text-muted hover:text-red hover:bg-red-dim transition-colors flex-shrink-0"
+                              title="Cancel item"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                          {isCancelled && (
+                            <span className="ml-1 text-[9px] font-bold uppercase text-red flex-shrink-0">Void</span>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -381,13 +428,17 @@ export default function WaiterView() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                   {filteredItems.map(item => {
                     const inCart = cart.find(c => c.id === item.id)
+                    const tracked = item.stock_qty != null
+                    const outOfStock = tracked && item.stock_qty <= 0
                     return (
                       <button
                         key={item.id}
                         onClick={() => addToCart(item)}
                         className={clsx(
                           'p-3 rounded-xl border-2 text-left transition-all',
-                          inCart
+                          outOfStock
+                            ? 'border-border bg-bg2 opacity-45 cursor-not-allowed'
+                            : inCart
                             ? 'border-green bg-green-dim'
                             : 'border-border bg-bg2 hover:border-green/40 hover:bg-surface2'
                         )}
@@ -396,12 +447,18 @@ export default function WaiterView() {
                         <p className="text-xs text-muted mt-0.5">{item.category_name || item.category || ''}</p>
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-sm font-bold text-green">{formatINR(item.price)}</span>
-                          {inCart && (
+                          {inCart && !outOfStock && (
                             <span className="w-5 h-5 bg-green text-white rounded-full text-[10px] font-bold flex items-center justify-center">
                               {inCart.qty}
                             </span>
                           )}
                         </div>
+                        {tracked && (
+                          <p className={clsx('text-[10px] font-bold mt-1',
+                            outOfStock ? 'text-red' : item.stock_qty <= 5 ? 'text-amber' : 'text-muted')}>
+                            {outOfStock ? 'Out of stock' : `${item.stock_qty} left`}
+                          </p>
+                        )}
                       </button>
                     )
                   })}
@@ -414,6 +471,22 @@ export default function WaiterView() {
       )}
 
       <KOTModal data={kotModal} onClose={() => setKotModal(null)} />
+
+      {/* Cancel Item Modal */}
+      <CancelItemModal
+        open={!!cancelModal}
+        onClose={() => setCancelModal(null)}
+        item={cancelModal}
+        requiresApproval={cancelModal?.requiresApproval ?? false}
+        isPending={cancelItemMut.isPending}
+        onConfirm={(cancelBody) => {
+          cancelItemMut.mutate({
+            orderId: cancelModal.orderId,
+            itemId: cancelModal.id,
+            body: cancelBody,
+          })
+        }}
+      />
     </div>
   )
 }

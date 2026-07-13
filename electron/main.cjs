@@ -119,6 +119,19 @@ function buildKOTBuffer(kotData) {
 
 // ── ESC/POS bill builder ──────────────────────────────────────────────────────
 
+// Merge duplicate bill lines (same item re-added across KOTs) into one row —
+// must stay in sync with the grouping in src/components/ui/ReceiptView.jsx.
+function mergeBillItems(rawItems) {
+  const merged = []
+  for (const item of (rawItems || []).filter(i => !i.cancelled_at)) {
+    const amt = Number(item.total ?? item.price * item.quantity) || 0
+    const ex = merged.find(m => m.name === item.name && m.price === item.price)
+    if (ex) { ex.quantity += item.quantity; ex.total += amt }
+    else merged.push({ ...item, total: amt })
+  }
+  return merged
+}
+
 function buildBillBuffer(billData) {
   const { restaurant: r = {}, order: o = {} } = billData
   const ESC = 0x1b, GS = 0x1d
@@ -169,7 +182,7 @@ function buildBillBuffer(billData) {
   parts.push(Buffer.from(`${lpad('#', 3)}${lpad('Item', 19)}${rpad('Qty', 4)}${rpad('Rate', 8)}${rpad('Amt', 8)}\n`))
   parts.push(boldOff, LINE)
 
-  const items = (o.items || []).filter(i => !i.cancelled_at)
+  const items = mergeBillItems(o.items)
   items.forEach((item, idx) => {
     const amt = (item.total || item.price * item.quantity)
     parts.push(Buffer.from(
@@ -228,6 +241,19 @@ function printToThermal(ip, buffer) {
 
 // ── USB printing via Windows driver (HTML → webContents.print) ───────────────
 
+// Silent printing from a hidden window steals input focus from the app window
+// (Chromium quirk): buttons keep working but text fields can no longer take the
+// caret until the window is blurred and refocused. Restore it programmatically —
+// but only when our window holds OS focus, so a background poller print never
+// yanks focus away from another app the user switched to.
+function _restoreMainWindowFocus(printWin) {
+  const main = BrowserWindow.getAllWindows().find(w => w !== printWin && !w.isDestroyed() && w.isVisible())
+  if (!main || !main.isFocused()) return
+  main.blur()
+  main.focus()
+  main.webContents.focus()
+}
+
 function printHtmlToUSB(printerName, htmlContent) {
   return new Promise((resolve, reject) => {
     const tmpFile = path.join(os.tmpdir(), `bb_receipt_${Date.now()}.html`)
@@ -235,6 +261,8 @@ function printHtmlToUSB(printerName, htmlContent) {
 
     const win = new BrowserWindow({
       show: false,
+      focusable: false,
+      skipTaskbar: true,
       width: 800,
       height: 1000,
       webPreferences: { nodeIntegration: false, contextIsolation: true },
@@ -247,6 +275,7 @@ function printHtmlToUSB(printerName, htmlContent) {
         (success, errorType) => {
           win.destroy()
           try { fs.unlinkSync(tmpFile) } catch {}
+          _restoreMainWindowFocus(win)
           success ? resolve() : reject(new Error(errorType || 'Print failed'))
         }
       )
@@ -309,7 +338,7 @@ function buildBillHtml(billData) {
   const timeStr   = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
   const typeLabel = { dine_in: 'Dine-In', takeaway: 'Takeaway', delivery: 'Delivery', zomato: 'Zomato', swiggy: 'Swiggy' }[o.order_type] || ''
   const payLabel  = { cash: 'Cash', upi: 'UPI', card: 'Card' }[o.payment_method] || o.payment_method || ''
-  const items     = (o.items || []).filter(i => !i.cancelled_at)
+  const items     = mergeBillItems(o.items)
   const totalQty  = items.reduce((s, i) => s + i.quantity, 0)
 
   const rows = items.map((item, idx) => {

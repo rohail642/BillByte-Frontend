@@ -5,6 +5,8 @@ export const getTableOrder      = (table)      => client.get(`/orders/table/${ta
 export const createOrder        = body         => client.post('/orders/', body)
 export const addItemsToOrder    = (id, body)   => client.post(`/orders/${id}/add-items`, body)
 export const removeOrderItem    = (orderId, itemId) => client.delete(`/orders/${orderId}/items/${itemId}`)
+export const cancelOrderItem    = (orderId, itemId, body) => client.post(`/orders/${orderId}/items/${itemId}/cancel`, body)
+export const retryCancelNotify  = (orderId, itemId) => client.post(`/orders/${orderId}/items/${itemId}/cancel/notify`)
 export const getOrder           = id           => client.get(`/orders/${id}`)
 export const updateStatus       = (id, status) => client.patch(`/orders/${id}/status`, { status })
 export const updateKotStatus    = (id, kotNum, status) => client.patch(`/orders/${id}/kot/${kotNum}/status`, { status })

@@ -117,6 +117,19 @@ export function buildKOTBuffer(kotData) {
 }
 
 // ── Bill ───────────────────────────────────────────────────────────────────
+// Merge duplicate bill lines (same item re-added across KOTs) into one row —
+// must stay in sync with the grouping in src/components/ui/ReceiptView.jsx.
+function mergeBillItems(rawItems) {
+  const merged = []
+  for (const item of (rawItems || []).filter(i => !i.cancelled_at)) {
+    const amt = Number(item.total ?? item.price * item.quantity) || 0
+    const ex = merged.find(m => m.name === item.name && m.price === item.price)
+    if (ex) { ex.quantity += item.quantity; ex.total += amt }
+    else merged.push({ ...item, total: amt })
+  }
+  return merged
+}
+
 export function buildBillBuffer(billData) {
   const { restaurant: r = {}, order: o = {} } = billData
 
@@ -157,7 +170,7 @@ export function buildBillBuffer(billData) {
   parts.push(enc(`${lpad('#', 3)}${lpad('Item', 19)}${rpad('Qty', 4)}${rpad('Rate', 8)}${rpad('Amt', 8)}\n`))
   parts.push(BOLD_OFF, LINE)
 
-  const items = (o.items || []).filter(i => !i.cancelled_at)
+  const items = mergeBillItems(o.items)
   items.forEach((item, idx) => {
     const amt = (item.total || item.price * item.quantity)
     parts.push(enc(

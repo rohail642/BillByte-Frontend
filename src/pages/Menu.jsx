@@ -12,7 +12,8 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
-import { Plus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags, Upload, AlertTriangle } from 'lucide-react'
+import Toggle from '../components/ui/Toggle'
+import { Plus, Minus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags, Upload, AlertTriangle } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = [
@@ -48,6 +49,7 @@ export default function Menu() {
   const updateMut  = useMutation({ mutationFn: ({id,...b}) => updateMenuItem(id,b), onSuccess: () => { toast.success('Item updated!'); refetch(); setItemModal(null) }, onError: e => toast.error(String(e)) })
   const deleteMut  = useMutation({ mutationFn: deleteMenuItem, onSuccess: () => { toast.success('Item deleted!'); refetch() }, onError: e => toast.error(String(e)) })
   const toggleMut  = useMutation({ mutationFn: ({id,active}) => updateMenuItem(id,{is_active:active}), onSuccess: () => refetch(), onError: e => toast.error(String(e)) })
+  const stockMut   = useMutation({ mutationFn: ({id,stock_qty}) => updateMenuItem(id,{stock_qty}), onSuccess: () => refetch(), onError: e => toast.error(String(e)) })
   const recipeMut  = useMutation({
     mutationFn: saveRecipe,
     onSuccess: () => { toast.success('Recipe saved! Inventory will auto-deduct on KOT.'); refetchRecipes(); setRecipeModal(null) },
@@ -121,8 +123,8 @@ export default function Menu() {
   const recipeMap = {} // menuItemId → recipe
   ;(recipes||[]).forEach(r => { recipeMap[r.menu_item_id] = r })
 
-  const openAddItem  = () => { setForm({ emoji:'🍽️', food_type:'veg', is_active:true }); setItemModal('add') }
-  const openEditItem = (item) => { setForm({...item}); setItemModal(item) }
+  const openAddItem  = () => { setForm({ emoji:'🍽️', food_type:'veg', is_active:true, track_stock:false, stock_qty:'' }); setItemModal('add') }
+  const openEditItem = (item) => { setForm({ ...item, track_stock: item.stock_qty != null, stock_qty: item.stock_qty ?? '' }); setItemModal(item) }
 
   const openRecipeModal = (item) => {
     const existing = recipeMap[item.id]
@@ -211,7 +213,7 @@ export default function Menu() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b border-border">
-                    {['Item','Category','Price','Type','Recipe','Status',''].map(h => (
+                    {['Item','Category','Price','Type','Stock','Recipe','Status',''].map(h => (
                       <th key={h} className="text-left text-[11px] font-bold uppercase tracking-wide text-muted pb-2 px-2 first:pl-0">{h}</th>
                     ))}
                   </tr></thead>
@@ -228,9 +230,30 @@ export default function Menu() {
                         <td className="py-3 px-2 font-bold text-green2">₹{item.price}</td>
                         <td className="py-3 px-2">
                           {item.food_type !== 'na' && (
-                            <Badge color={item.food_type==='veg'?'green':item.food_type==='vegan'?'blue':'orange'}>
+                            <Badge color={item.food_type==='veg'?'green':item.food_type==='vegan'?'blue':item.food_type==='egg'?'amber':'orange'}>
                               {item.food_type.replace('_','-')}
                             </Badge>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">
+                          {item.stock_qty == null ? (
+                            <span className="text-xs text-muted">—</span>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button title="Reduce stock"
+                                onClick={() => stockMut.mutate({ id: item.id, stock_qty: Math.max(0, item.stock_qty - 1) })}
+                                className="w-5 h-5 rounded-full bg-surface3 flex items-center justify-center text-text3 hover:bg-border2 hover:text-text transition-colors">
+                                <Minus size={10}/>
+                              </button>
+                              <Badge color={item.stock_qty === 0 ? 'red' : item.stock_qty <= 5 ? 'amber' : 'green'}>
+                                {item.stock_qty === 0 ? 'Out' : item.stock_qty}
+                              </Badge>
+                              <button title="Add stock"
+                                onClick={() => stockMut.mutate({ id: item.id, stock_qty: item.stock_qty + 1 })}
+                                className="w-5 h-5 rounded-full bg-surface3 flex items-center justify-center text-text3 hover:bg-border2 hover:text-text transition-colors">
+                                <Plus size={10}/>
+                              </button>
+                            </div>
                           )}
                         </td>
                         <td className="py-3 px-2">
@@ -445,8 +468,9 @@ export default function Menu() {
           <Button variant="primary" loading={createMut.isPending||updateMut.isPending}
             onClick={() => {
               if (!form.name || !form.price) { toast.error('Name and price required'); return }
-              if (itemModal === 'add') createMut.mutate({ name:form.name, price:Number(form.price), emoji:form.emoji, food_type:form.food_type, category_id:form.category_id||null, is_active:true })
-              else updateMut.mutate({ id:itemModal.id, name:form.name, price:Number(form.price), emoji:form.emoji, food_type:form.food_type, category_id:form.category_id||null })
+              const stockQty = form.track_stock ? Math.max(0, Number(form.stock_qty) || 0) : null
+              if (itemModal === 'add') createMut.mutate({ name:form.name, price:Number(form.price), emoji:form.emoji, food_type:form.food_type, category_id:form.category_id||null, is_active:true, stock_qty:stockQty })
+              else updateMut.mutate({ id:itemModal.id, name:form.name, price:Number(form.price), emoji:form.emoji, food_type:form.food_type, category_id:form.category_id||null, stock_qty:stockQty })
             }}>
             {itemModal === 'add' ? 'Add Item' : 'Save Changes'}
           </Button>
@@ -461,6 +485,7 @@ export default function Menu() {
             <Select label="Type" value={form.food_type||'veg'} onChange={e=>set('food_type',e.target.value)}>
               <option value="veg">Veg</option>
               <option value="non_veg">Non-Veg</option>
+              <option value="egg">Egg</option>
               <option value="vegan">Vegan</option>
               <option value="na">N/A</option>
             </Select>
@@ -469,6 +494,16 @@ export default function Menu() {
             <option value="">No category</option>
             {(categories||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
+          <Toggle
+            label="Track stock count"
+            description="Reduces by 1 every time this item is ordered. Item shows as out of stock at 0."
+            checked={!!form.track_stock}
+            onChange={v => set('track_stock', v)}
+          />
+          {form.track_stock && (
+            <Input label="Quantity in stock" type="number" min="0" placeholder="e.g. 24"
+              value={form.stock_qty} onChange={e=>set('stock_qty',e.target.value)} />
+          )}
         </div>
       </Modal>
 

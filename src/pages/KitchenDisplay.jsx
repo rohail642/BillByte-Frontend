@@ -222,10 +222,15 @@ function KotCard({ card, onAdvance, isLoading }) {
           return (
             <li key={item.id} className="flex items-baseline justify-between gap-2">
               <span className={clsx(
-                'text-sm font-semibold leading-snug',
+                'text-sm font-semibold leading-snug flex items-center gap-1.5',
                 voided ? 'line-through text-red opacity-60' : 'text-text'
               )}>
                 {item.name}
+                {voided && (
+                  <span className="text-[9px] font-bold uppercase text-red not-italic opacity-100 bg-red-dim px-1 py-0.5 rounded">
+                    Cancelled
+                  </span>
+                )}
               </span>
               <span className={clsx(
                 'text-base font-black flex-shrink-0',
