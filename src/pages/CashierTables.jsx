@@ -23,9 +23,7 @@ const SECTION_COLORS = {
   gray:   '#78716c',
 }
 
-// Paused: the deployed backend doesn't have the /orders/{id}/items/{id}/cancel
-// endpoint yet, so the flow fails with "Not Found". Flip to true after redeploying.
-const CANCEL_ITEM_ENABLED = false
+const CANCEL_ITEM_ENABLED = true
 
 export default function CashierTables() {
   const qc = useQueryClient()
