@@ -5,7 +5,7 @@ import { Menu, Bell, TrendingUp, Plus } from 'lucide-react'
 import { useUIStore } from '../../store/ui'
 import { useAuthStore } from '../../store/auth'
 import { getAlerts } from '../../api/inventory'
-import { getOrders, getDashboardSummary } from '../../api/orders'
+import { getDashboardSummary } from '../../api/orders'
 import { formatINR } from '../../utils'
 
 const titles = {
@@ -44,12 +44,9 @@ export default function Topbar() {
     refetchInterval: 60000,
   })
 
-  const { data: liveOrders } = useQuery({
-    queryKey: ['orders', 'live'],
-    queryFn: () => getOrders({ limit: 50 }),
-    refetchInterval: 10000,
-  })
-
+  // The Topbar is mounted on every page, so anything it polls is paid for all day
+  // on every terminal. It only needs a count and two order numbers, which
+  // /orders/summary now returns directly — no order list fetch required.
   const { data: summary } = useQuery({
     queryKey: ['summary'],
     queryFn: getDashboardSummary,
@@ -83,17 +80,15 @@ export default function Topbar() {
     })
   }
 
-  // Pending orders (KOT sent but not paid)
-  const pendingOrders = (liveOrders || []).filter(o =>
-    o.status === 'kot_sent' && o.payment_status !== 'paid'
-  )
-  if (pendingOrders.length > 0) {
+  // Pending orders (KOT sent but not paid) — counted server-side
+  const pendingCount = summary?.kot_pending || 0
+  if (pendingCount > 0) {
     notifications.push({
       id: 'pending-orders',
       type: 'info',
       icon: '🍽️',
-      title: `${pendingOrders.length} active order${pendingOrders.length > 1 ? 's' : ''} in kitchen`,
-      desc: pendingOrders.map(o => o.order_number).slice(0, 2).join(', '),
+      title: `${pendingCount} active order${pendingCount > 1 ? 's' : ''} in kitchen`,
+      desc: (summary?.kot_pending_numbers || []).join(', '),
       action: () => { navigate('/orders'); setOpen(false) },
     })
   }
