@@ -60,7 +60,12 @@ export default function POSTerminal() {
   const total    = cart.getTotal()
 
   const { data: categories }    = useQuery({ queryKey: ['categories'],   queryFn: getCategories })
-  const { data: menuItems }     = useQuery({ queryKey: ['menuItems'],    queryFn: () => getMenuItems({ active_only: true }), refetchInterval: 30000 })
+  // The menu only changes when someone edits it, and every mutation already
+  // invalidates ['menuItems'] — so polling it re-downloaded the whole menu
+  // 2,880 times a day to see the same rows. Fetch on mount, then trust
+  // invalidation. Keyed 'active' because CashierTables/WaiterView want the
+  // unfiltered list under the same prefix.
+  const { data: menuItems }     = useQuery({ queryKey: ['menuItems', 'active'], queryFn: () => getMenuItems({ active_only: true }), staleTime: 15 * 60_000 })
   const { data: profile }       = useQuery({ queryKey: ['profile'],      queryFn: getProfile })
   const { data: activeTables }  = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 10000 })
 

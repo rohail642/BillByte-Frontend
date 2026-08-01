@@ -91,7 +91,7 @@ export default function OnlineOrders() {
   })
 
   const { data: menuItems } = useQuery({
-    queryKey: ['menuItems'],
+    queryKey: ['menuItems', 'active'],
     queryFn: () => getMenuItems({ active_only: true }),
   })
 

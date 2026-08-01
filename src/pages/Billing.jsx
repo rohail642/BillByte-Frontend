@@ -57,7 +57,7 @@ export default function Billing() {
   const total    = cart.getTotal()
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: getCategories })
-  const { data: menuItems }  = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ active_only: true }), refetchInterval: 30000 })
+  const { data: menuItems }  = useQuery({ queryKey: ['menuItems', 'active'], queryFn: () => getMenuItems({ active_only: true }), staleTime: 15 * 60_000 })
   const { data: profile }    = useQuery({ queryKey: ['profile'],   queryFn: getProfile })
   const { data: activeTables } = useQuery({ queryKey: ['activeTables'], queryFn: getActiveTables, refetchInterval: 10000 })
 

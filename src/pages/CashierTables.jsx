@@ -88,7 +88,7 @@ export default function CashierTables() {
   })
 
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories })
-  const { data: menuData } = useQuery({ queryKey: ['menuItems'], queryFn: () => getMenuItems({ limit: 200 }), refetchInterval: 30000 })
+  const { data: menuData } = useQuery({ queryKey: ['menuItems', 'all'], queryFn: () => getMenuItems({ limit: 200 }), staleTime: 15 * 60_000 })
   const menuItems = useMemo(() => (menuData?.items || menuData || []).filter(i => i.is_available !== false), [menuData])
 
   const filteredItems = useMemo(() => {
