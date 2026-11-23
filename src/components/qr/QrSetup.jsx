@@ -147,7 +147,7 @@ export default function QrSetup({ onEditTables }) {
 
         <Card className="space-y-2">
           <h3 className="font-display font-bold">UPI payments <span className="text-xs font-normal text-muted">(optional)</span></h3>
-          <p className="text-xs text-muted">Guests get a “Pay by UPI” button with the bill amount filled in.</p>
+          <p className="text-xs text-muted">Guests get GPay / PhonePe / Paytm buttons with the bill amount filled in, plus your UPI ID to copy. Use a <b>business</b> UPI ID (GPay for Business, PhonePe Business, Paytm for Business): UPI apps often block link payments to personal UPI IDs. Staff still confirm the payment and mark the bill paid.</p>
           <div className="flex gap-2 items-center">
             <div className="flex-1">
               <Input placeholder="yourcafe@okhdfcbank" value={upiVal} onChange={e => setUpi(e.target.value)} />

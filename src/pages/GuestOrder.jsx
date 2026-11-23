@@ -24,6 +24,66 @@ function rememberPlaced(token, res) {
   return list
 }
 
+// UPI payment without a gateway. A bare upi:// link lets Android open whatever app
+// last claimed UPI (often WhatsApp), so we offer one button per app instead,
+// plus the UPI ID to copy as a fallback that always works.
+const UPI_APPS = [
+  { name: 'GPay', pkg: 'com.google.android.apps.nbu.paisa.user', ios: 'gpay://upi/pay' },
+  { name: 'PhonePe', pkg: 'com.phonepe.app', ios: 'phonepe://pay' },
+  { name: 'Paytm', pkg: 'net.one97.paytm', ios: 'paytmmp://pay' },
+]
+function UpiPay({ link, amount }) {
+  const [copied, setCopied] = useState(false)
+  const query = link.slice(link.indexOf('?') + 1)
+  const vpa = new URLSearchParams(query).get('pa') || ''
+  const ua = navigator.userAgent || ''
+  const android = /Android/i.test(ua)
+  const ios = /iPhone|iPad|iPod/i.test(ua)
+  const href = app => android
+    ? `intent://pay?${query}#Intent;scheme=upi;package=${app.pkg};end`
+    : `${app.ios}?${query}`
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(vpa) } catch {
+      const t = document.createElement('textarea'); t.value = vpa; document.body.appendChild(t); t.select()
+      try { document.execCommand('copy') } catch { /* ignore */ } t.remove()
+    }
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <div className="mt-4 rounded-2xl border border-border2 bg-bg2 p-3">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-semibold text-text2">Pay by UPI</span>
+        <span className="text-lg font-bold tabular-nums">{inr(amount)}</span>
+      </div>
+      {(android || ios) && (
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {UPI_APPS.map(a => (
+            <a key={a.name} href={href(a)}
+              className="h-11 flex items-center justify-center rounded-xl bg-green text-white text-sm font-bold active:scale-[0.97] transition-transform">
+              {a.name}
+            </a>
+          ))}
+        </div>
+      )}
+      {android && (
+        <a href={link} className="mt-2 block text-center text-xs font-semibold text-text3">Pay with another UPI app →</a>
+      )}
+      <div className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-border2 px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] uppercase tracking-wide text-text3">{android || ios ? 'Or pay to UPI ID' : 'UPI ID'}</p>
+          <p className="text-sm font-semibold truncate">{vpa}</p>
+        </div>
+        <button onClick={copy}
+          className={clsx('h-8 px-3 rounded-lg text-xs font-bold border transition-colors',
+            copied ? 'bg-green text-white border-green' : 'border-green text-green')}>
+          {copied ? 'Copied ✓' : 'Copy'}
+        </button>
+      </div>
+      <p className="mt-2 text-[11px] text-center text-text3">Show the payment screen to staff to close your bill.</p>
+    </div>
+  )
+}
+
 function FoodDot({ type }) {
   const nonVeg = type === 'non_veg' || type === 'egg'
   return (
@@ -262,13 +322,7 @@ export default function GuestOrder() {
                 {latestBill.payment_status === 'paid' ? (
                   <p className="mt-3 text-center text-sm font-semibold text-green">Paid ✓</p>
                 ) : latestBill.upi_link ? (
-                  <>
-                    <a href={latestBill.upi_link}
-                      className="mt-3 flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-green text-white font-bold">
-                      <IndianRupee size={16} /> Pay {inr(latestBill.total_amount)} by UPI
-                    </a>
-                    <p className="mt-2 text-[11px] text-center text-text3">Opens GPay / PhonePe / Paytm. Show the payment screen to staff to close your bill.</p>
-                  </>
+                  <UpiPay link={latestBill.upi_link} amount={latestBill.total_amount} />
                 ) : (
                   <p className="mt-3 text-center text-xs text-text3">Please pay at the counter.</p>
                 )}
