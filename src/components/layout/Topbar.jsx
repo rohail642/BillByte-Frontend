@@ -1,12 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Menu, Bell, TrendingUp, Plus } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { Menu, Bell, TrendingUp, Plus, QrCode } from 'lucide-react'
 import { useUIStore } from '../../store/ui'
 import { useAuthStore } from '../../store/auth'
 import { getAlerts } from '../../api/inventory'
 import { getDashboardSummary } from '../../api/orders'
 import { formatINR } from '../../utils'
+import { QrInbox } from '../qr/QrRequests'
+import { usePendingQr, qrBeep } from '../qr/usePendingQr'
 
 const titles = {
   '/':              'Dashboard',
@@ -29,6 +32,7 @@ export default function Topbar() {
   const navigate  = useNavigate()
   const title     = titles[location.pathname] || 'BillByte'
   const [open, setOpen] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
   const ref = useRef(null)
 
   // Close on outside click
@@ -52,6 +56,23 @@ export default function Topbar() {
     queryFn: getDashboardSummary,
     refetchInterval: 30000,
   })
+
+  // Guest QR orders: beep + toast whenever a new one arrives, on any page.
+  const { count: qrPending, requests: qrRequests } = usePendingQr()
+  const seenQr = useRef(null)
+  useEffect(() => {
+    const ids = qrRequests.map(r => r.id)
+    if (seenQr.current && ids.some(id => !seenQr.current.has(id))) {
+      qrBeep()
+      toast(t => (
+        <span className="flex items-center gap-3 text-sm">
+          New table order
+          <button className="font-bold text-green2 hover:underline" onClick={() => { setQrOpen(true); toast.dismiss(t.id) }}>View</button>
+        </span>
+      ), { id: 'qr-new', icon: '📱', duration: 8000 })
+    }
+    seenQr.current = new Set(ids)
+  }, [qrRequests])
 
   // Build notifications
   const notifications = []
@@ -93,6 +114,18 @@ export default function Topbar() {
     })
   }
 
+  // Guest QR orders waiting for staff — top of the list, they block a table
+  if (qrPending > 0) {
+    notifications.unshift({
+      id: 'qr-pending',
+      type: 'warning',
+      icon: '📱',
+      title: `${qrPending} table order${qrPending > 1 ? 's' : ''} waiting for confirmation`,
+      desc: 'Guests ordered by scanning the table QR',
+      action: () => { setQrOpen(true); setOpen(false) },
+    })
+  }
+
   const totalCount = notifications.length
 
   return (
@@ -115,6 +148,14 @@ export default function Topbar() {
           <span className="w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
           Live
         </div>
+
+        {qrPending > 0 && (
+          <button onClick={() => setQrOpen(true)}
+            className="flex items-center gap-1.5 bg-amber-dim border border-amber/40 text-amber rounded-full px-3 py-1 text-[11px] font-bold hover:opacity-90 animate-pulse">
+            <QrCode size={13} />
+            {qrPending} table order{qrPending > 1 ? 's' : ''}
+          </button>
+        )}
 
         {/* Bell */}
         <div className="relative" ref={ref}>
@@ -190,6 +231,7 @@ export default function Topbar() {
           </button>
         )}
       </div>
+      <QrInbox open={qrOpen} onClose={() => setQrOpen(false)} />
     </header>
   )
 }

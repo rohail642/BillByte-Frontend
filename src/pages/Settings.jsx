@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProfile, updateProfile, changePassword, setManagerPin } from '../api/auth'
 import { getCategories } from '../api/menu'
@@ -17,8 +17,11 @@ import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
 import { getNotifPrefs, setNotifPref } from '../utils/notifPrefs'
-import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check, Printer, KeyRound, X } from 'lucide-react'
+import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check, Printer, KeyRound, X, QrCode } from 'lucide-react'
 import { clsx } from 'clsx'
+
+// Loaded on demand — pulls in the QR code generator.
+const QrSetup = lazy(() => import('../components/qr/QrSetup'))
 
 const SECTION_COLORS = [
   { id: 'blue',   hex: '#3b82f6' },
@@ -34,6 +37,7 @@ const SECTIONS = [
   { id: 'restaurant',    label: 'Restaurant',    icon: Store           },
   { id: 'billing',       label: 'Billing',       icon: Receipt         },
   { id: 'tables',        label: 'Tables',        icon: UtensilsCrossed },
+  { id: 'qr',            label: 'Table QR',      icon: QrCode          },
   { id: 'integrations',  label: 'Integrations',  icon: Link2           },
   { id: 'notifications', label: 'Notifications', icon: Bell            },
   { id: 'gst',           label: 'GST / Tax',     icon: FileText        },
@@ -430,6 +434,11 @@ export default function Settings() {
   }
 
   const content = {
+    qr: (
+      <Suspense fallback={<div className="flex justify-center py-12"><Spinner size="lg" /></div>}>
+        <QrSetup onEditTables={() => setActive('tables')} />
+      </Suspense>
+    ),
     restaurant: (
       <div className="space-y-4">
         <h3 className="font-display font-bold text-sm text-text">Restaurant Profile</h3>

@@ -12,6 +12,7 @@ import KitchenDisplay from './pages/KitchenDisplay'
 
 const Orders       = lazy(() => import('./pages/Orders'))
 const OnlineOrders = lazy(() => import('./pages/OnlineOrders'))
+const GuestOrder   = lazy(() => import('./pages/GuestOrder'))
 const Menu         = lazy(() => import('./pages/Menu'))
 const Inventory    = lazy(() => import('./pages/Inventory'))
 const CRM          = lazy(() => import('./pages/CRM'))
@@ -139,6 +140,8 @@ export default function App() {
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+        {/* Public: guest self-ordering from a table QR code — no login */}
+        <Route path="/order/:token" element={<GuestOrder />} />
 
         {/* Waiter — full-screen, no sidebar */}
         <Route path="/waiter" element={

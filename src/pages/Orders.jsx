@@ -13,6 +13,7 @@ import { formatINR, statusColor, printKOTElectron, isNativeApp } from '../utils'
 import { CreditCard, RefreshCw, X, ChevronDown, Printer, UtensilsCrossed } from 'lucide-react'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 import { KOTModal } from '../components/ui/KOTView'
+import { QrPendingStrip } from '../components/qr/QrRequests'
 
 const STATUS_LABELS = { pending:'Pending', kot_sent:'KOT Sent', preparing:'Preparing', ready:'Ready', served:'Served', paid:'Paid', cancelled:'Cancelled' }
 
@@ -38,7 +39,7 @@ export default function Orders() {
     queryFn: () => {
       return getOrders({
         limit: 200,
-        ...(typeFilter ? { order_type: typeFilter } : {}),
+        ...(typeFilter && typeFilter !== 'qr' ? { order_type: typeFilter } : {}),
       })
     },
     refetchInterval: 15000,
@@ -89,6 +90,7 @@ export default function Orders() {
 
   const activeFilter = FILTERS.find(f => f.key === statusFilter)
   const filteredOrders = (orders || []).filter(o => {
+    if (typeFilter === 'qr' && o.platform !== 'qr') return false
     if (!activeFilter || !activeFilter.statuses.length) return true
     return activeFilter.statuses.includes(o.status)
   })
@@ -108,10 +110,14 @@ export default function Orders() {
             <option value="dine_in">Dine-in</option>
             <option value="takeaway">Takeaway</option>
             <option value="delivery">Delivery</option>
+            <option value="qr">Table QR</option>
           </select>
           <Button variant="secondary" size="sm" icon={<RefreshCw size={13}/>} onClick={() => refetch()}>Refresh</Button>
         </div>
       </div>
+
+      {/* Guest table-QR orders waiting for staff (hidden when none) */}
+      <QrPendingStrip />
 
       {/* Simplified filters */}
       <div className="flex gap-2 flex-wrap">
@@ -145,6 +151,7 @@ export default function Orders() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-display font-bold text-sm text-text">{order.order_number}</p>
                     <Badge color={statusColor(order.status)}>{STATUS_LABELS[order.status]}</Badge>
+                    {order.platform === 'qr' && <Badge color="purple">QR</Badge>}
                     <Badge color={order.payment_status === 'paid' ? 'green' : 'orange'}>
                       {order.payment_status === 'paid'
                         ? `${PAY_ICONS[order.payment_method] || '💳'} ${order.payment_method?.toUpperCase() || 'PAID'}`
