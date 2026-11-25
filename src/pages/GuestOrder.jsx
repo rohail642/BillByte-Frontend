@@ -94,6 +94,67 @@ function FoodDot({ type }) {
   )
 }
 
+// Which bills this phone watched while unpaid, and which "Paid" moments it has
+// already celebrated — so the animation plays once, only for a payment the
+// guest was actually waiting on (not an old bill seen on a later visit).
+const BILLS_KEY = 'bb_guest_bills'
+function billMarks() {
+  try { return JSON.parse(localStorage.getItem(BILLS_KEY) || '{}') } catch { return {} }
+}
+function markBill(no, state) {
+  try {
+    const m = billMarks()
+    if (m[no] === state) return
+    m[no] = state
+    const keys = Object.keys(m)
+    keys.slice(0, Math.max(0, keys.length - 30)).forEach(k => delete m[k])  // keep the last 30
+    localStorage.setItem(BILLS_KEY, JSON.stringify(m))
+  } catch { /* storage blocked — no animation, the Paid card still shows */ }
+}
+
+function PaidCelebration({ amount, restaurant, onDone }) {
+  // Keep the latest callback without restarting the timer on every re-render (polls).
+  const done = useRef(onDone)
+  useEffect(() => { done.current = onDone })
+  useEffect(() => {
+    const t = setTimeout(() => done.current(), 3200)
+    return () => clearTimeout(t)
+  }, [])
+  return (
+    <div role="status" aria-live="polite" onClick={() => done.current()}
+      className="bb-paid fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg px-6 text-center cursor-pointer">
+      <style>{`
+        .bb-paid { animation: bbFade .25s ease-out both; }
+        .bb-paid .ring { animation: bbRing 1.6s ease-out .35s both; }
+        .bb-paid .disc { animation: bbPop .55s cubic-bezier(.2,1.4,.4,1) .05s both; }
+        .bb-paid .tick { stroke-dasharray: 60; stroke-dashoffset: 60; animation: bbDraw .45s ease-out .5s forwards; }
+        .bb-paid .txt  { animation: bbUp .45s ease-out both; }
+        @keyframes bbFade { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes bbPop  { 0% { transform: scale(0) } 100% { transform: scale(1) } }
+        @keyframes bbDraw { to { stroke-dashoffset: 0 } }
+        @keyframes bbRing { 0% { transform: scale(.8); opacity: .55 } 100% { transform: scale(1.9); opacity: 0 } }
+        @keyframes bbUp   { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+        @media (prefers-reduced-motion: reduce) {
+          .bb-paid, .bb-paid .ring, .bb-paid .disc, .bb-paid .txt { animation: none }
+          .bb-paid .tick { animation: none; stroke-dashoffset: 0 }
+        }
+      `}</style>
+      <div className="relative w-28 h-28 mb-6">
+        <span className="ring absolute inset-0 rounded-full bg-green" />
+        <span className="disc absolute inset-0 rounded-full bg-green flex items-center justify-center shadow-lg">
+          <svg viewBox="0 0 52 52" className="w-14 h-14" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+            <path className="tick" d="M14 27 l8 8 l16 -18" />
+          </svg>
+        </span>
+      </div>
+      <p className="txt text-2xl font-display font-bold text-text" style={{ animationDelay: '.7s' }}>Payment received</p>
+      <p className="txt mt-1 text-3xl font-bold tabular-nums text-green" style={{ animationDelay: '.8s' }}>{inr(amount)}</p>
+      <p className="txt mt-3 text-sm text-text3" style={{ animationDelay: '.95s' }}>Thank you for dining at {restaurant}!</p>
+      <p className="txt absolute bottom-8 text-xs text-muted" style={{ animationDelay: '1.6s' }}>Tap to continue</p>
+    </div>
+  )
+}
+
 function stepOf(s) {
   if (s.status === 'pending') return { label: 'Waiting for staff to confirm', icon: Clock, tone: 'amber' }
   if (s.status === 'rejected') return { label: 'Not accepted', icon: CircleX, tone: 'red' }
@@ -111,8 +172,15 @@ const TONE = {
   green: 'bg-green-dim text-green', blue: 'bg-blue-dim text-blue',
 }
 
+// Scanning another table's QR while this page is open only changes the URL
+// hash — React would keep the old table's state (orders, "Paid", tab). Keying
+// by token gives every table a completely fresh page.
 export default function GuestOrder() {
   const { token } = useParams()
+  return <GuestOrderPage key={token} token={token} />
+}
+
+function GuestOrderPage({ token }) {
   const [menu, setMenu] = useState(null)
   const [error, setError] = useState(null)
   const [cat, setCat] = useState('all')
@@ -145,6 +213,15 @@ export default function GuestOrder() {
     document.addEventListener('visibilitychange', onVis)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis) }
   }, [refreshTable])
+
+  // Remember bills this phone saw while unpaid (see billMarks).
+  const watchedBill = (table?.bill || placed.map(p => statuses[p.id]?.bill).find(Boolean)) || null
+  const watchedNo = watchedBill?.payment_status === 'unpaid' ? watchedBill.order_number : null
+  useEffect(() => { if (watchedNo && !billMarks()[watchedNo]) markBill(watchedNo, 'open') }, [watchedNo])
+  const [, setCelebrated] = useState(0)
+  const finishPaid = useCallback(no => {
+    markBill(no, 'celebrated'); setView('status'); setCelebrated(n => n + 1)
+  }, [])
 
   async function callStaff(kind, payBy) {
     setCalling(kind); setCallMsg(null)
@@ -245,6 +322,9 @@ export default function GuestOrder() {
   }
 
   const bill = table?.bill || placed.map(p => statuses[p.id]?.bill).find(Boolean)
+  const billNo = bill?.order_number
+  const billPaid = bill?.payment_status === 'paid'
+  const showPaid = billPaid && billMarks()[billNo] === 'open'
   const mine = new Set(placed.map(p => p.id))
   const othersPending = (table?.pending || []).filter(r => !mine.has(r.id))
   const calls = new Set(table?.calls || [])
@@ -255,6 +335,9 @@ export default function GuestOrder() {
 
   return (
     <div className="min-h-screen bg-bg text-text pb-28">
+      {showPaid && (
+        <PaidCelebration amount={bill.total_amount} restaurant={menu.restaurant_name} onDone={() => finishPaid(billNo)} />
+      )}
       {/* Header */}
       <header className="sticky top-0 z-20 bg-bg2/95 backdrop-blur border-b border-border">
         <div className="max-w-2xl mx-auto px-4 pt-3 pb-2">
