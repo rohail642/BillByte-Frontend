@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { Search, Plus, Minus, ShoppingBag, X, Check, Clock, ChefHat, Bell, BellRing, Receipt, CircleX, Loader2, Users } from 'lucide-react'
+import { Search, Plus, Minus, ShoppingBag, X, Check, Clock, ChefHat, Bell, BellRing, Receipt, CircleX, Loader2, Users, Banknote, CreditCard } from 'lucide-react'
 import { clsx } from 'clsx'
 import { guestGetMenu, guestPlaceOrder, guestGetStatus, guestGetTable, guestCall } from '../api/tableOrdering'
 
@@ -24,62 +24,102 @@ function rememberPlaced(token, res) {
   return list
 }
 
-// UPI payment without a gateway. A bare upi:// link lets Android open whatever app
-// last claimed UPI (often WhatsApp), so we offer one button per app instead,
-// plus the UPI ID to copy as a fallback that always works.
+// Payment without a gateway. A bare upi:// link lets Android open whatever app
+// last claimed UPI (often WhatsApp), so each app gets its own button. Only apps
+// whose links work on this phone are shown: Android can target any installed app
+// (and offers the system chooser as "Other app"); iPhone only the big three via
+// their own link schemes; a computer gets just the UPI ID. Copying the UPI ID
+// always works, with any app.
 const UPI_APPS = [
   { name: 'GPay', pkg: 'com.google.android.apps.nbu.paisa.user', ios: 'gpay://upi/pay' },
   { name: 'PhonePe', pkg: 'com.phonepe.app', ios: 'phonepe://pay' },
   { name: 'Paytm', pkg: 'net.one97.paytm', ios: 'paytmmp://pay' },
+  { name: 'CRED', pkg: 'com.dreamplug.androidapp' },
+  { name: 'BHIM', pkg: 'in.org.npci.upiapp' },
 ]
-function UpiPay({ link, amount }) {
+const UA = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
+const IS_ANDROID = /Android/i.test(UA)
+const IS_IOS = /iPhone|iPad|iPod/i.test(UA) || (/Macintosh/.test(UA) && typeof document !== 'undefined' && 'ontouchend' in document)
+
+function PaySheet({ bill, busy, onClose, onUpi, onCounter }) {
   const [copied, setCopied] = useState(false)
-  const query = link.slice(link.indexOf('?') + 1)
-  const vpa = new URLSearchParams(query).get('pa') || ''
-  const ua = navigator.userAgent || ''
-  const android = /Android/i.test(ua)
-  const ios = /iPhone|iPad|iPod/i.test(ua)
-  const href = app => android
-    ? `intent://pay?${query}#Intent;scheme=upi;package=${app.pkg};end`
-    : `${app.ios}?${query}`
+  const link = bill.upi_link
+  const query = link ? link.slice(link.indexOf('?') + 1) : ''
+  const vpa = link ? new URLSearchParams(query).get('pa') || '' : ''
+  const apps = IS_ANDROID ? UPI_APPS : IS_IOS ? UPI_APPS.filter(a => a.ios) : []
+  const href = a => (IS_ANDROID ? `intent://pay?${query}#Intent;scheme=upi;package=${a.pkg};end` : `${a.ios}?${query}`)
+
+  const openApp = (e, url) => {
+    e.preventDefault()
+    onUpi()                            // tell staff (fire-and-forget) before leaving the page
+    window.location.assign(url)
+  }
   const copy = async () => {
     try { await navigator.clipboard.writeText(vpa) } catch {
       const t = document.createElement('textarea'); t.value = vpa; document.body.appendChild(t); t.select()
       try { document.execCommand('copy') } catch { /* ignore */ } t.remove()
     }
     setCopied(true); setTimeout(() => setCopied(false), 2000)
+    onUpi(true)
   }
+
   return (
-    <div className="mt-4 rounded-2xl border border-border2 bg-bg2 p-3">
-      <div className="flex items-baseline justify-between">
-        <span className="text-sm font-semibold text-text2">Pay by UPI</span>
-        <span className="text-lg font-bold tabular-nums">{inr(amount)}</span>
-      </div>
-      {(android || ios) && (
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {UPI_APPS.map(a => (
-            <a key={a.name} href={href(a)}
-              className="h-11 flex items-center justify-center rounded-xl bg-green text-white text-sm font-bold active:scale-[0.97] transition-transform">
-              {a.name}
-            </a>
-          ))}
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center" onClick={onClose}>
+      <div className="w-full max-w-2xl bg-bg2 rounded-t-2xl max-h-[90vh] overflow-y-auto p-4 pb-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display font-bold text-lg">Pay <span className="tabular-nums">{inr(bill.total_amount)}</span></h2>
+          <button aria-label="Close" onClick={onClose} className="p-1.5 text-text3"><X size={18} /></button>
         </div>
-      )}
-      {android && (
-        <a href={link} className="mt-2 block text-center text-xs font-semibold text-text3">Pay with another UPI app →</a>
-      )}
-      <div className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-border2 px-3 py-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-wide text-text3">{android || ios ? 'Or pay to UPI ID' : 'UPI ID'}</p>
-          <p className="text-sm font-semibold truncate">{vpa}</p>
+
+        {link ? (
+          <>
+            <p className="mt-3 mb-2 text-[11px] font-bold uppercase tracking-wide text-text3">Pay by UPI</p>
+            {apps.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {apps.map(a => (
+                  <a key={a.name} href={href(a)} onClick={e => openApp(e, href(a))}
+                    className="h-12 flex items-center justify-center rounded-xl border border-border2 bg-bg text-sm font-bold text-text active:scale-[0.97] transition-transform">
+                    {a.name}
+                  </a>
+                ))}
+                {IS_ANDROID && (
+                  <a href={link} onClick={e => openApp(e, link)}
+                    className="h-12 flex items-center justify-center rounded-xl border border-dashed border-border2 bg-bg text-sm font-semibold text-text2 active:scale-[0.97] transition-transform">
+                    Other app
+                  </a>
+                )}
+              </div>
+            )}
+            <div className={clsx('flex items-center gap-3 rounded-xl border border-border2 bg-bg px-3 py-2.5', apps.length > 0 && 'mt-2')}>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] uppercase tracking-wide text-text3">UPI ID · works with any UPI app</p>
+                <p className="text-sm font-semibold truncate">{vpa}</p>
+              </div>
+              <button onClick={copy}
+                className={clsx('h-8 px-3 rounded-lg text-xs font-bold border transition-colors flex-shrink-0',
+                  copied ? 'bg-green text-white border-green' : 'border-green text-green')}>
+                {copied ? 'Copied ✓' : 'Copy'}
+              </button>
+            </div>
+            <p className="mt-2 text-[11px] text-text3">After paying, show the payment screen to staff. This page turns to “Paid” once they confirm.</p>
+            <p className="mt-4 mb-2 text-[11px] font-bold uppercase tracking-wide text-text3">Or pay at the table</p>
+          </>
+        ) : (
+          <p className="mt-3 mb-2 text-[11px] font-bold uppercase tracking-wide text-text3">Pay at the table</p>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => onCounter('cash')} disabled={busy}
+            className="h-12 rounded-xl border border-border2 bg-bg text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.97] disabled:opacity-60">
+            <Banknote size={16} /> Cash
+          </button>
+          <button onClick={() => onCounter('card')} disabled={busy}
+            className="h-12 rounded-xl border border-border2 bg-bg text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.97] disabled:opacity-60">
+            <CreditCard size={16} /> Card
+          </button>
         </div>
-        <button onClick={copy}
-          className={clsx('h-8 px-3 rounded-lg text-xs font-bold border transition-colors',
-            copied ? 'bg-green text-white border-green' : 'border-green text-green')}>
-          {copied ? 'Copied ✓' : 'Copy'}
-        </button>
+        <p className="mt-2 text-[11px] text-center text-text3">Staff will come to your table with the bill.</p>
       </div>
-      <p className="mt-2 text-[11px] text-center text-text3">Show the payment screen to staff to close your bill.</p>
     </div>
   )
 }
@@ -196,7 +236,7 @@ function GuestOrderPage({ token }) {
   const [view, setView] = useState(() => (loadPlaced(token).length ? 'status' : 'menu'))
   const [table, setTable] = useState(null)       // shared: running bill, pending orders, open calls
   const [calling, setCalling] = useState(null)   // 'waiter' | 'bill' while sending
-  const [billSheet, setBillSheet] = useState(false)
+  const [paySheet, setPaySheet] = useState(false)
   const [callMsg, setCallMsg] = useState(null)
 
   // The open bill's number we've seen: lets this phone (only) see it turn "Paid".
@@ -227,8 +267,10 @@ function GuestOrderPage({ token }) {
     setCalling(kind); setCallMsg(null)
     try {
       await guestCall(token, { kind, pay_by: payBy || null })
-      setCallMsg(kind === 'bill' ? 'Bill requested — staff will bring it.' : 'Waiter called — someone will be with you shortly.')
-      setBillSheet(false)
+      setCallMsg(kind === 'bill'
+        ? `Staff will bring the bill${payBy ? ` — paying by ${payBy}` : ''}.`
+        : 'Waiter called — someone will be with you shortly.')
+      setPaySheet(false)
       refreshTable()
     } catch (e) {
       setCallMsg(e.message)
@@ -236,6 +278,14 @@ function GuestOrderPage({ token }) {
       setCalling(null)
     }
   }
+  // Guest tapped a UPI app (or copied the UPI ID): let staff know to check for
+  // the payment. Fire-and-forget with keepalive — the page may be leaving.
+  function startUpi(stay) {
+    guestCall(token, { kind: 'bill', pay_by: 'upi' }, { keepalive: true }).then(refreshTable).catch(() => {})
+    setCallMsg('Paying by UPI — show the payment screen to staff. This page updates once they confirm.')
+    if (!stay) setTimeout(() => setPaySheet(false), 300)
+  }
+
 
   useEffect(() => {
     guestGetMenu(token).then(setMenu).catch(e => setError(e.message))
@@ -418,19 +468,18 @@ function GuestOrderPage({ token }) {
           </ul>
         ) : (
           <div className="py-4 space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex gap-2">
               <button onClick={() => callStaff('waiter')} disabled={!!calling || calls.has('waiter')}
-                className={clsx('h-12 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-100',
+                className={clsx('flex-1 h-12 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-100',
                   calls.has('waiter') ? 'bg-blue-dim border-blue/30 text-blue' : 'bg-bg2 border-border2 text-text')}>
                 {calling === 'waiter' ? <Loader2 size={16} className="animate-spin" /> : calls.has('waiter') ? <Check size={16} /> : <BellRing size={16} />}
                 {calls.has('waiter') ? 'Waiter called' : 'Call waiter'}
               </button>
-              <button onClick={() => setBillSheet(true)} disabled={!!calling || calls.has('bill') || !bill || bill.payment_status === 'paid'}
-                className={clsx('h-12 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60',
-                  calls.has('bill') ? 'bg-green-dim border-green/30 text-green disabled:opacity-100' : 'bg-bg2 border-border2 text-text')}>
-                {calling === 'bill' ? <Loader2 size={16} className="animate-spin" /> : calls.has('bill') ? <Check size={16} /> : <Receipt size={16} />}
-                {calls.has('bill') ? 'Bill requested' : 'Ask for bill'}
-              </button>
+              {calls.has('bill') && unpaidBill && (
+                <div className="flex-1 h-12 rounded-xl border bg-green-dim border-green/30 text-green text-sm font-bold flex items-center justify-center gap-2">
+                  <Check size={16} /> Staff notified
+                </div>
+              )}
             </div>
             {callMsg && <p className="text-xs text-center text-text3">{callMsg}</p>}
 
@@ -492,11 +541,7 @@ function GuestOrderPage({ token }) {
                     <p className="text-base font-bold flex items-center justify-center gap-1.5"><Check size={18} /> Paid</p>
                     <p className="text-xs">Thank you! Visit again.</p>
                   </div>
-                ) : bill.upi_link ? (
-                  <UpiPay link={bill.upi_link} amount={bill.total_amount} />
-                ) : (
-                  <p className="mt-3 text-center text-xs text-text3">Please pay at the counter.</p>
-                )}
+                ) : null}
               </section>
             )}
 
@@ -518,26 +563,20 @@ function GuestOrderPage({ token }) {
         </div>
       )}
 
-      {/* Ask for bill: how will you pay? */}
-      {billSheet && (
-        <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center" onClick={() => setBillSheet(false)}>
-          <div className="w-full max-w-2xl bg-bg2 rounded-t-2xl p-4 pb-6 space-y-3" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h2 className="font-display font-bold">How would you like to pay?</h2>
-              <button aria-label="Close" onClick={() => setBillSheet(false)} className="p-1.5 text-text3"><X size={18} /></button>
-            </div>
-            {bill && <p className="text-sm text-text3">Bill total <span className="font-bold text-text tabular-nums">{inr(bill.total_amount)}</span></p>}
-            <div className="grid grid-cols-3 gap-2">
-              {[['cash', 'Cash'], ['upi', 'UPI'], ['card', 'Card']].map(([k, label]) => (
-                <button key={k} onClick={() => callStaff('bill', k)} disabled={!!calling}
-                  className="h-12 rounded-xl border border-border2 bg-bg text-sm font-bold active:scale-[0.97] disabled:opacity-60">
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-center text-text3">Staff will bring the bill to your table.</p>
-          </div>
+      {/* Pay bar — always in reach on the Table view while the bill is open */}
+      {view === 'status' && unpaidBill && !paySheet && (
+        <div className="fixed bottom-0 inset-x-0 z-30 p-3 bg-gradient-to-t from-bg via-bg to-transparent">
+          <button onClick={() => setPaySheet(true)}
+            className="max-w-2xl mx-auto w-full flex items-center justify-between px-4 py-3.5 rounded-xl bg-green text-white font-bold shadow-lg">
+            <span className="flex items-center gap-2"><Receipt size={18} /> Pay bill</span>
+            <span className="tabular-nums">{inr(bill.total_amount)} →</span>
+          </button>
         </div>
+      )}
+
+      {paySheet && unpaidBill && (
+        <PaySheet bill={bill} busy={!!calling} onClose={() => setPaySheet(false)}
+          onUpi={startUpi} onCounter={method => callStaff('bill', method)} />
       )}
 
       {/* Cart sheet */}

@@ -135,7 +135,9 @@ function CallCards({ calls }) {
             <div className="min-w-0 flex-1">
               <p className="font-display font-bold text-sm text-text">Table {c.table_number}</p>
               <p className="text-xs text-text2">
-                {bill ? `Wants the bill${c.pay_by ? ` · paying by ${PAY_LABEL[c.pay_by]}` : ''}` : 'Calling a waiter'}
+                {!bill ? 'Calling a waiter'
+                  : c.pay_by === 'upi' ? 'Paying by UPI · check the payment, then collect'
+                  : `Wants the bill${c.pay_by ? ` · paying by ${PAY_LABEL[c.pay_by]}` : ''}`}
                 <span className="text-muted"> · {timeAgo(c.created_at)}</span>
               </p>
             </div>
@@ -195,7 +197,7 @@ export function QrAlerts({ open, setOpen, pollMs, compact = false }) {
         qrBeep()
         const call = calls.find(c => fresh.includes(`c${c.id}`))
         const msg = call
-          ? `Table ${call.table_number} ${call.kind === 'bill' ? 'wants the bill' : 'is calling a waiter'}`
+          ? `Table ${call.table_number} ${call.kind !== 'bill' ? 'is calling a waiter' : call.pay_by === 'upi' ? 'is paying by UPI — check payment' : 'wants the bill'}`
           : 'New table order'
         toast(t => (
           <span className="flex items-center gap-3 text-sm">

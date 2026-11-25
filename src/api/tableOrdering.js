@@ -42,4 +42,4 @@ export const guestGetMenu    = token                 => publicCall(`/${encodeURI
 export const guestPlaceOrder = (token, body)         => publicCall(`/${encodeURIComponent(token)}/orders`, { method: 'POST', body: JSON.stringify(body) })
 export const guestGetStatus  = (token, id, key)      => publicCall(`/${encodeURIComponent(token)}/orders/${id}?key=${encodeURIComponent(key)}`)
 export const guestGetTable   = (token, seen)         => publicCall(`/${encodeURIComponent(token)}/table${seen ? `?seen=${encodeURIComponent(seen)}` : ''}`)
-export const guestCall       = (token, body)         => publicCall(`/${encodeURIComponent(token)}/call`, { method: 'POST', body: JSON.stringify(body) })
+export const guestCall       = (token, body, opts)   => publicCall(`/${encodeURIComponent(token)}/call`, { method: 'POST', body: JSON.stringify(body), ...(opts || {}) })
