@@ -4,7 +4,12 @@ import { Search, Plus, Minus, ShoppingBag, X, Check, Clock, ChefHat, Bell, BellR
 import { clsx } from 'clsx'
 import { guestGetMenu, guestPlaceOrder, guestGetStatus, guestGetTable, guestCall } from '../api/tableOrdering'
 
-const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+// ₹290 for whole rupees, ₹304.50 (never ₹304.5) when there are paise.
+const inr = n => {
+  const v = Number(n || 0)
+  const paise = Math.round(v * 100) % 100 !== 0
+  return '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: paise ? 2 : 0, maximumFractionDigits: 2 })
+}
 const FINAL = ['rejected', 'paid', 'cancelled']  // 'served' isn't final: keep polling until the bill is paid
 const POLL_MS = 15000
 
@@ -481,7 +486,9 @@ function GuestOrderPage({ token }) {
                 </div>
               )}
             </div>
-            {callMsg && <p className="text-xs text-center text-text3">{callMsg}</p>}
+            {billPaid
+              ? <p className="text-xs text-center text-text3">Any questions about the bill? Call a waiter.</p>
+              : callMsg && <p className="text-xs text-center text-text3">{callMsg}</p>}
 
             {othersPending.length > 0 && (
               <section className="rounded-xl bg-bg2 border border-border overflow-hidden">
@@ -545,9 +552,12 @@ function GuestOrderPage({ token }) {
               </section>
             )}
 
-            <button onClick={() => setView('menu')} className="w-full py-3 rounded-xl border border-border2 text-sm font-semibold text-text2 bg-bg2">
-              {placed.length || bill || othersPending.length ? '+ Order more' : 'See the menu'}
-            </button>
+            {/* After paying, the visit is done — no "Order more" (the Menu tab is still there). */}
+            {!billPaid && (
+              <button onClick={() => setView('menu')} className="w-full py-3 rounded-xl border border-border2 text-sm font-semibold text-text2 bg-bg2">
+                {placed.length || bill || othersPending.length ? '+ Order more' : 'See the menu'}
+              </button>
+            )}
           </div>
         )}
       </main>
