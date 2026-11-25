@@ -16,7 +16,7 @@ export default function Login() {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const loginMut = useMutation({
-    mutationFn: () => login({ email: form.email, password: form.password }),
+    mutationFn: () => login({ email: (form.email || '').trim().toLowerCase(), password: form.password }),
     onSuccess: (data) => { setAuth(data); toast.success(`Welcome back, ${data.name}!`); navigate('/') },
     onError:   (e)    => toast.error(typeof e === 'string' ? e : e?.message || 'Login failed'),
   })
@@ -42,7 +42,7 @@ export default function Login() {
 
           <div className="p-6">
             <div className="flex flex-col gap-4">
-              <Input label="Email" type="email" placeholder="you@restaurant.com" autoComplete="email"
+              <Input label="Email" type="email" placeholder="you@restaurant.com" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 value={form.email || ''} onChange={e => set('email', e.target.value)} />
               <Input label="Password" type="password" placeholder="••••••••" autoComplete="current-password"
                 value={form.password || ''} onChange={e => set('password', e.target.value)}

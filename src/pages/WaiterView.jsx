@@ -21,6 +21,7 @@ const SECTION_COLORS = {
 import { clsx } from 'clsx'
 import { formatINR, printKOTElectron, isNativeApp } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
+import { QrAlerts } from '../components/qr/QrRequests'
 
 export default function WaiterView() {
   const { user, restaurantName, clearAuth, token } = useAuthStore()
@@ -33,6 +34,7 @@ export default function WaiterView() {
   }, [token, restaurantName])
 
   const [selectedTable, setSelectedTable] = useState(null)
+  const [qrOpen, setQrOpen] = useState(false)
   const [cart, setCart] = useState([])
   const [note, setNote] = useState('')
   const [kotModal, setKotModal] = useState(null)
@@ -202,6 +204,7 @@ export default function WaiterView() {
           </div>
         )}
         <div className="flex-1" />
+        <QrAlerts open={qrOpen} setOpen={setQrOpen} pollMs={15000} compact={!!selectedTable} />
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-green text-white flex items-center justify-center text-[11px] font-bold">
             {(user?.name || 'W').slice(0, 1).toUpperCase()}

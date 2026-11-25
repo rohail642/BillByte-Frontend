@@ -728,7 +728,12 @@ function createWindow() {
 
 // ── Auto-updater ──────────────────────────────────────────────────────────────
 
+// Once an update is downloaded, stop re-checking and ask only once. If the
+// cashier picks "Later", it installs on the next app quit anyway.
+let updateReady = false
 autoUpdater.on('update-downloaded', () => {
+  if (updateReady) return
+  updateReady = true
   dialog.showMessageBox({
     type: 'info',
     title: 'Update Ready',
@@ -754,7 +759,11 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  if (!isDev) autoUpdater.checkForUpdatesAndNotify()
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {})
+    // Counter PCs run for days without restarting, so keep checking.
+    setInterval(() => { if (!updateReady) autoUpdater.checkForUpdatesAndNotify().catch(() => {}) }, 4 * 60 * 60 * 1000)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { Search, Plus, Minus, ShoppingBag, X, Check, Clock, ChefHat, Bell, CircleX, IndianRupee, Loader2 } from 'lucide-react'
+import { Search, Plus, Minus, ShoppingBag, X, Check, Clock, ChefHat, Bell, BellRing, Receipt, CircleX, Loader2, Users } from 'lucide-react'
 import { clsx } from 'clsx'
-import { guestGetMenu, guestPlaceOrder, guestGetStatus } from '../api/tableOrdering'
+import { guestGetMenu, guestPlaceOrder, guestGetStatus, guestGetTable, guestCall } from '../api/tableOrdering'
 
 const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })
-const FINAL = ['rejected', 'served', 'paid']
+const FINAL = ['rejected', 'paid', 'cancelled']  // 'served' isn't final: keep polling until the bill is paid
 const POLL_MS = 15000
 
 // Per-table memory of what this phone has ordered, so a refresh keeps the
@@ -14,8 +14,8 @@ const storeKey = token => `bb_guest_${token.slice(-16)}`
 function loadPlaced(token) {
   try {
     const v = JSON.parse(localStorage.getItem(storeKey(token)) || '[]')
-    // forget orders older than 12h (next visit to the same table)
-    return v.filter(p => Date.now() - p.at < 12 * 3600 * 1000)
+    // forget orders older than 6h, so a later visit to the same table starts fresh
+    return v.filter(p => Date.now() - p.at < 6 * 3600 * 1000)
   } catch { return [] }
 }
 function rememberPlaced(token, res) {
@@ -99,6 +99,7 @@ function stepOf(s) {
   if (s.status === 'rejected') return { label: 'Not accepted', icon: CircleX, tone: 'red' }
   const k = s.kitchen_status
   if (k === 'paid') return { label: 'Paid — thank you!', icon: Check, tone: 'green' }
+  if (k === 'cancelled') return { label: 'Cancelled — please ask staff', icon: CircleX, tone: 'red' }
   if (k === 'served') return { label: 'Served — enjoy!', icon: Check, tone: 'green' }
   if (k === 'ready') return { label: 'Ready — coming to your table', icon: Bell, tone: 'green' }
   if (k === 'preparing') return { label: 'Being prepared', icon: ChefHat, tone: 'blue' }
@@ -125,6 +126,39 @@ export default function GuestOrder() {
   const [placed, setPlaced] = useState(() => loadPlaced(token))
   const [statuses, setStatuses] = useState({})  // request id -> status payload
   const [view, setView] = useState(() => (loadPlaced(token).length ? 'status' : 'menu'))
+  const [table, setTable] = useState(null)       // shared: running bill, pending orders, open calls
+  const [calling, setCalling] = useState(null)   // 'waiter' | 'bill' while sending
+  const [billSheet, setBillSheet] = useState(false)
+  const [callMsg, setCallMsg] = useState(null)
+
+  // The open bill's number we've seen: lets this phone (only) see it turn "Paid".
+  const seenBill = useRef(null)
+  const refreshTable = useCallback(() => guestGetTable(token, seenBill.current).then(t => {
+    if (t?.bill?.order_number) seenBill.current = t.bill.order_number
+    setTable(t)
+  }).catch(() => {}), [token])
+  // Everyone at the table sees the same bill, so poll it while the page is open.
+  useEffect(() => {
+    refreshTable()
+    const t = setInterval(() => { if (!document.hidden) refreshTable() }, POLL_MS)
+    const onVis = () => { if (!document.hidden) refreshTable() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis) }
+  }, [refreshTable])
+
+  async function callStaff(kind, payBy) {
+    setCalling(kind); setCallMsg(null)
+    try {
+      await guestCall(token, { kind, pay_by: payBy || null })
+      setCallMsg(kind === 'bill' ? 'Bill requested — staff will bring it.' : 'Waiter called — someone will be with you shortly.')
+      setBillSheet(false)
+      refreshTable()
+    } catch (e) {
+      setCallMsg(e.message)
+    } finally {
+      setCalling(null)
+    }
+  }
 
   useEffect(() => {
     guestGetMenu(token).then(setMenu).catch(e => setError(e.message))
@@ -185,6 +219,7 @@ export default function GuestOrder() {
       })
       setPlaced(rememberPlaced(token, res))
       setCart({}); setNote(''); setCartOpen(false); setView('status')
+      refreshTable()
       window.scrollTo(0, 0)
     } catch (e) {
       setPlaceErr(e.message)
@@ -209,7 +244,14 @@ export default function GuestOrder() {
     return <div className="min-h-screen bg-bg flex items-center justify-center"><Loader2 className="animate-spin text-green" /></div>
   }
 
-  const latestBill = placed.map(p => statuses[p.id]?.bill).find(Boolean)
+  const bill = table?.bill || placed.map(p => statuses[p.id]?.bill).find(Boolean)
+  const mine = new Set(placed.map(p => p.id))
+  const othersPending = (table?.pending || []).filter(r => !mine.has(r.id))
+  const calls = new Set(table?.calls || [])
+  const unpaidBill = bill && bill.payment_status !== 'paid'
+  const tableBusy = !!unpaidBill || othersPending.length > 0  // a paid bill doesn't block the next guests
+  const tableItemCount = (unpaidBill ? bill.items : []).reduce((n, i) => n + i.quantity, 0)
+    + othersPending.reduce((n, r) => n + r.items.reduce((m, i) => m + i.quantity, 0), 0)
 
   return (
     <div className="min-h-screen bg-bg text-text pb-28">
@@ -221,12 +263,12 @@ export default function GuestOrder() {
               <h1 className="font-display font-bold text-[17px] truncate">{menu.restaurant_name}</h1>
               <p className="text-xs text-text3">Table {menu.table_number}</p>
             </div>
-            {placed.length > 0 && (
+            {(
               <div className="flex bg-surface2 rounded-lg p-0.5 text-xs font-semibold flex-shrink-0">
                 {['menu', 'status'].map(v => (
                   <button key={v} onClick={() => setView(v)}
                     className={clsx('px-3 py-1.5 rounded-md', view === v ? 'bg-bg2 text-text shadow-sm' : 'text-text3')}>
-                    {v === 'menu' ? 'Menu' : 'My orders'}
+                    {v === 'menu' ? 'Menu' : 'Table'}
                   </button>
                 ))}
               </div>
@@ -254,6 +296,14 @@ export default function GuestOrder() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4">
+        {view === 'menu' && tableBusy && (
+          <button onClick={() => setView('status')}
+            className="mt-3 w-full flex items-center gap-2 rounded-xl bg-blue-dim text-blue px-3 py-2.5 text-xs font-semibold text-left">
+            <Users size={15} className="flex-shrink-0" />
+            <span className="flex-1">{tableItemCount} item{tableItemCount === 1 ? '' : 's'} already ordered at this table. Check before ordering again.</span>
+            <span className="font-bold">View →</span>
+          </button>
+        )}
         {view === 'menu' ? (
           <ul className="divide-y divide-border">
             {visible.length === 0 && <li className="py-12 text-center text-sm text-text3">No dishes found</li>}
@@ -285,6 +335,40 @@ export default function GuestOrder() {
           </ul>
         ) : (
           <div className="py-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => callStaff('waiter')} disabled={!!calling || calls.has('waiter')}
+                className={clsx('h-12 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-100',
+                  calls.has('waiter') ? 'bg-blue-dim border-blue/30 text-blue' : 'bg-bg2 border-border2 text-text')}>
+                {calling === 'waiter' ? <Loader2 size={16} className="animate-spin" /> : calls.has('waiter') ? <Check size={16} /> : <BellRing size={16} />}
+                {calls.has('waiter') ? 'Waiter called' : 'Call waiter'}
+              </button>
+              <button onClick={() => setBillSheet(true)} disabled={!!calling || calls.has('bill') || !bill || bill.payment_status === 'paid'}
+                className={clsx('h-12 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60',
+                  calls.has('bill') ? 'bg-green-dim border-green/30 text-green disabled:opacity-100' : 'bg-bg2 border-border2 text-text')}>
+                {calling === 'bill' ? <Loader2 size={16} className="animate-spin" /> : calls.has('bill') ? <Check size={16} /> : <Receipt size={16} />}
+                {calls.has('bill') ? 'Bill requested' : 'Ask for bill'}
+              </button>
+            </div>
+            {callMsg && <p className="text-xs text-center text-text3">{callMsg}</p>}
+
+            {othersPending.length > 0 && (
+              <section className="rounded-xl bg-bg2 border border-border overflow-hidden">
+                <div className={clsx('flex items-center gap-2 px-4 py-3 text-sm font-semibold', TONE.amber)}>
+                  <Users size={16} /> Ordered by others at this table
+                </div>
+                {othersPending.map(r => (
+                  <div key={r.id} className="px-4 py-2 text-sm border-t border-border first:border-t-0">
+                    <p className="text-[11px] text-text3 mb-0.5">{r.guest_name || 'Someone'} · waiting for staff</p>
+                    {r.items.map((it, j) => <p key={j}>{it.quantity} × {it.name}</p>)}
+                  </div>
+                ))}
+              </section>
+            )}
+
+            {!bill && !othersPending.length && !placed.length && (
+              <p className="py-8 text-center text-sm text-text3">Nothing ordered at this table yet.</p>
+            )}
+
             {placed.map((p, idx) => {
               const s = statuses[p.id]
               if (!s) return <div key={p.id} className="p-4 rounded-xl bg-bg2 border border-border text-sm text-text3">Loading…</div>
@@ -305,24 +389,28 @@ export default function GuestOrder() {
               )
             })}
 
-            {latestBill && (
+            {bill && (
               <section className="rounded-xl bg-bg2 border border-border p-4">
-                <h2 className="font-display font-bold mb-2">Table bill</h2>
+                <h2 className="font-display font-bold mb-0.5">Table bill</h2>
+                <p className="text-[11px] text-text3 mb-2">Everything ordered at this table, by anyone</p>
                 <ul className="text-sm space-y-1">
-                  {latestBill.items.map((it, j) => (
+                  {bill.items.map((it, j) => (
                     <li key={j} className="flex justify-between"><span>{it.quantity} × {it.name}</span><span className="tabular-nums">{inr(it.total)}</span></li>
                   ))}
                 </ul>
                 <div className="border-t border-border mt-3 pt-2 text-sm space-y-1">
-                  <div className="flex justify-between text-text3"><span>Subtotal</span><span className="tabular-nums">{inr(latestBill.subtotal)}</span></div>
-                  {latestBill.discount_amount > 0 && <div className="flex justify-between text-text3"><span>Discount</span><span className="tabular-nums">−{inr(latestBill.discount_amount)}</span></div>}
-                  <div className="flex justify-between text-text3"><span>GST</span><span className="tabular-nums">{inr(latestBill.gst_amount)}</span></div>
-                  <div className="flex justify-between font-bold text-base pt-1"><span>Total</span><span className="tabular-nums">{inr(latestBill.total_amount)}</span></div>
+                  <div className="flex justify-between text-text3"><span>Subtotal</span><span className="tabular-nums">{inr(bill.subtotal)}</span></div>
+                  {bill.discount_amount > 0 && <div className="flex justify-between text-text3"><span>Discount</span><span className="tabular-nums">−{inr(bill.discount_amount)}</span></div>}
+                  <div className="flex justify-between text-text3"><span>GST</span><span className="tabular-nums">{inr(bill.gst_amount)}</span></div>
+                  <div className="flex justify-between font-bold text-base pt-1"><span>Total</span><span className="tabular-nums">{inr(bill.total_amount)}</span></div>
                 </div>
-                {latestBill.payment_status === 'paid' ? (
-                  <p className="mt-3 text-center text-sm font-semibold text-green">Paid ✓</p>
-                ) : latestBill.upi_link ? (
-                  <UpiPay link={latestBill.upi_link} amount={latestBill.total_amount} />
+                {bill.payment_status === 'paid' ? (
+                  <div className="mt-3 rounded-xl bg-green-dim text-green py-3 text-center">
+                    <p className="text-base font-bold flex items-center justify-center gap-1.5"><Check size={18} /> Paid</p>
+                    <p className="text-xs">Thank you! Visit again.</p>
+                  </div>
+                ) : bill.upi_link ? (
+                  <UpiPay link={bill.upi_link} amount={bill.total_amount} />
                 ) : (
                   <p className="mt-3 text-center text-xs text-text3">Please pay at the counter.</p>
                 )}
@@ -330,7 +418,7 @@ export default function GuestOrder() {
             )}
 
             <button onClick={() => setView('menu')} className="w-full py-3 rounded-xl border border-border2 text-sm font-semibold text-text2 bg-bg2">
-              + Order more
+              {placed.length || bill || othersPending.length ? '+ Order more' : 'See the menu'}
             </button>
           </div>
         )}
@@ -344,6 +432,28 @@ export default function GuestOrder() {
             <span className="flex items-center gap-2"><ShoppingBag size={18} /> {count} item{count > 1 ? 's' : ''} · {inr(subtotal)}</span>
             <span>View order →</span>
           </button>
+        </div>
+      )}
+
+      {/* Ask for bill: how will you pay? */}
+      {billSheet && (
+        <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center" onClick={() => setBillSheet(false)}>
+          <div className="w-full max-w-2xl bg-bg2 rounded-t-2xl p-4 pb-6 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-bold">How would you like to pay?</h2>
+              <button aria-label="Close" onClick={() => setBillSheet(false)} className="p-1.5 text-text3"><X size={18} /></button>
+            </div>
+            {bill && <p className="text-sm text-text3">Bill total <span className="font-bold text-text tabular-nums">{inr(bill.total_amount)}</span></p>}
+            <div className="grid grid-cols-3 gap-2">
+              {[['cash', 'Cash'], ['upi', 'UPI'], ['card', 'Card']].map(([k, label]) => (
+                <button key={k} onClick={() => callStaff('bill', k)} disabled={!!calling}
+                  className="h-12 rounded-xl border border-border2 bg-bg text-sm font-bold active:scale-[0.97] disabled:opacity-60">
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-center text-text3">Staff will bring the bill to your table.</p>
+          </div>
         </div>
       )}
 

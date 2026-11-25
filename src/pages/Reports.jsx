@@ -102,7 +102,7 @@ export default function Reports() {
   const [exportingGST, setExportingGST]   = useState(false)
   const [exportingInv, setExportingInv]   = useState(false)
 
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = getExportRange('today').to  // local (India) date, not UTC
   const [exportPeriod, setExportPeriod] = useState('month')
   const [customFrom,   setCustomFrom]   = useState(todayStr)
   const [customTo,     setCustomTo]     = useState(todayStr)
@@ -246,7 +246,7 @@ export default function Reports() {
         ]),
       ]
 
-      download('﻿' + toCSV(rows), `BillByte-Inventory-${new Date().toISOString().slice(0,10)}.csv`, 'text/csv;charset=utf-8;')
+      download('﻿' + toCSV(rows), `BillByte-Inventory-${getExportRange('today').to}.csv`, 'text/csv;charset=utf-8;')
       toast.success(`✅ Inventory exported — ${data.total_items} items`, { id: 'inv' })
     } catch { toast.error('Inventory export failed', { id: 'inv' })
     } finally { setExportingInv(false) }
