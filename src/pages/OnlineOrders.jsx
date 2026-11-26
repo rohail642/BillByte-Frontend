@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import PayIcon from '../components/ui/PayIcon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getOrders, createOrder, updateStatus, collectPayment } from '../api/orders'
 import { getMenuItems } from '../api/menu'
@@ -11,7 +12,7 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
-import { Plus, Phone, RefreshCw, ChevronDown, Bike, X, Trash2 } from 'lucide-react'
+import { Plus, Phone, RefreshCw, ChevronDown, Bike, X, Trash2, MessageCircle, Check } from 'lucide-react'
 import { formatINR, timeAgo } from '../utils'
 import { getNotifPrefs } from '../utils/notifPrefs'
 
@@ -34,9 +35,9 @@ function playAlertSound() {
 }
 
 const PLATFORMS = [
-  { id: 'zomato',   label: 'Zomato',   color: 'red',   emoji: '🔴' },
-  { id: 'swiggy',   label: 'Swiggy',   color: 'orange',emoji: '🟠' },
-  { id: 'whatsapp', label: 'WhatsApp', color: 'green', emoji: '💬' },
+  { id: 'zomato',   label: 'Zomato',   color: 'red',    dot: 'bg-red',    text: 'text-red' },
+  { id: 'swiggy',   label: 'Swiggy',   color: 'orange', dot: 'bg-orange', text: 'text-orange' },
+  { id: 'whatsapp', label: 'WhatsApp', color: 'green',  dot: 'bg-green',  text: 'text-green' },
 ]
 
 const DELIVERY_STATUS = ['pending','kot_sent','preparing','ready','out_for_delivery','delivered','cancelled']
@@ -59,7 +60,6 @@ const STATUS_COLOR = {
   cancelled:        'red',
 }
 
-const PAY_ICONS = { cash:'💵', upi:'📱', card:'💳', online:'🌐' }
 
 export default function OnlineOrders() {
   const qc = useQueryClient()
@@ -105,7 +105,7 @@ export default function OnlineOrders() {
     pendingIds.forEach(id => { if (!knownPendingIds.current.has(id)) hasNew = true })
     if (hasNew && getNotifPrefs().orderAlert) {
       playAlertSound()
-      toast('🛵 New order received!', { icon: '🔔', duration: 6000 })
+      toast('New delivery order received', { icon: <Bike size={16} className="text-orange" />, duration: 6000 })
     }
     knownPendingIds.current = pendingIds
   }, [orders])
@@ -132,7 +132,7 @@ export default function OnlineOrders() {
 
   const collectMut = useMutation({
     mutationFn: ({ id, method }) => collectPayment(id, { payment_method: method, discount_percent: 0 }),
-    onSuccess: () => { toast.success('✅ Payment collected!'); refetchAll(); setCollectModal(null) },
+    onSuccess: () => { toast.success('Payment collected'); refetchAll(); setCollectModal(null) },
     onError: e => toast.error(String(e)),
   })
 
@@ -156,7 +156,7 @@ export default function OnlineOrders() {
       return order
     },
     onSuccess: (order) => {
-      toast.success(`✅ Order created — #${order.order_number}`)
+      toast.success(`Order created — #${order.order_number}`)
       refetchAll()
       setNewOrderModal(false)
       resetForm()
@@ -217,7 +217,7 @@ export default function OnlineOrders() {
             <button key={p.id} onClick={() => setPlatformFilter(platformFilter === p.id ? '' : p.id)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                 platformFilter === p.id ? 'bg-green-dim border-green/30 text-green2' : 'border-border2 bg-surface2 text-text2 hover:border-green'}`}>
-              {p.emoji} {p.label}
+              <span className={`inline-block w-2 h-2 rounded-full ${p.dot} mr-1.5 align-middle`} />{p.label}
             </button>
           ))}
         </div>
@@ -241,7 +241,7 @@ export default function OnlineOrders() {
       {isLoading ? (
         <div className="flex justify-center py-12"><Spinner size="lg"/></div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon="🛵" title="No delivery orders yet"
+        <EmptyState icon={<Bike />} title="No delivery orders yet"
           description="Orders from Zomato, Swiggy, WhatsApp and phone calls will appear here" />
       ) : (
         <div className="space-y-2">
@@ -252,7 +252,9 @@ export default function OnlineOrders() {
               <Card key={order.id} className={`overflow-hidden transition-all ${isNew ? 'border-orange/40 shadow-sm' : ''}`}>
                 <div className="flex items-center gap-3 flex-wrap">
                   {/* Platform badge */}
-                  <div className="flex-shrink-0 text-xl">{platform?.emoji || '📦'}</div>
+                  <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-surface2 flex items-center justify-center">
+                    {platform?.id === 'whatsapp' ? <MessageCircle size={18} className={platform.text} /> : <Bike size={18} className={platform?.text || 'text-muted'} />}
+                  </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
@@ -264,13 +266,13 @@ export default function OnlineOrders() {
                       {platform && <Badge color={platform.color}>{platform.label}</Badge>}
                       {order.payment_status === 'paid' && (
                         <Badge color="green">
-                          {PAY_ICONS[order.payment_method]} {order.payment_method?.toUpperCase()}
+                          <PayIcon method={order.payment_method} size={11} className="mr-1" />{order.payment_method?.toUpperCase()}
                         </Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted mt-0.5">
-                      {order.customer_name && `👤 ${order.customer_name}`}
-                      {order.customer_phone && ` · 📞 ${order.customer_phone}`}
+                      {order.customer_name}
+                      {order.customer_phone && `${order.customer_name ? ' · ' : ''}${order.customer_phone}`}
                       {' · '}{timeAgo(order.created_at)}
                       {order.notes && ` · ${order.notes}`}
                     </p>
@@ -285,11 +287,11 @@ export default function OnlineOrders() {
                       <>
                         <Button variant="primary" size="xs"
                           onClick={() => statusMut.mutate({ id: order.id, status: 'kot_sent' })}>
-                          ✓ Accept
+                          <Check size={12} className="inline -mt-0.5 mr-1" />Accept
                         </Button>
                         <Button variant="danger" size="xs"
                           onClick={() => { if(confirm('Reject this order?')) statusMut.mutate({ id: order.id, status: 'cancelled' }) }}>
-                          ✕ Reject
+                          <X size={12} className="inline -mt-0.5 mr-1" />Reject
                         </Button>
                       </>
                     )}
@@ -349,7 +351,7 @@ export default function OnlineOrders() {
       )}
 
       {/* ── NEW ORDER MODAL ───────────────────────────────────────────────── */}
-      <Modal open={newOrderModal} onClose={() => setNewOrderModal(false)} title="🛵 New Delivery Order" size="xl">
+      <Modal open={newOrderModal} onClose={() => setNewOrderModal(false)} title="New Delivery Order" size="xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Left — customer + platform */}
           <div className="space-y-3">
@@ -363,7 +365,7 @@ export default function OnlineOrders() {
                         ? 'bg-green-dim border-green/30 text-green2'
                         : 'bg-surface2 border-border text-text2 hover:border-green'
                     }`}>
-                    {p.emoji} {p.label}
+                    <span className={`inline-block w-2 h-2 rounded-full ${p.dot} mr-1.5 align-middle`} />{p.label}
                   </button>
                 ))}
               </div>
@@ -377,9 +379,9 @@ export default function OnlineOrders() {
               value={address} onChange={e => setAddress(e.target.value)} />
 
             <Select label="Payment Method" value={payMethod} onChange={e => setPayMethod(e.target.value)}>
-              <option value="online">🌐 Online / Prepaid</option>
-              <option value="cash">💵 Cash on Delivery</option>
-              <option value="upi">📱 UPI on Delivery</option>
+              <option value="online">Online / Prepaid</option>
+              <option value="cash">Cash on Delivery</option>
+              <option value="upi">UPI on Delivery</option>
             </Select>
 
             {/* Cart summary */}
@@ -407,7 +409,7 @@ export default function OnlineOrders() {
             <p className="text-xs font-bold text-text2">Add Items</p>
             <input
               className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-green"
-              placeholder="🔍 Search menu..."
+              placeholder="Search menu..."
               value={itemSearch} onChange={e => setItemSearch(e.target.value)}
             />
             <div className="overflow-y-auto space-y-1" style={{ maxHeight: 320 }}>
@@ -434,17 +436,17 @@ export default function OnlineOrders() {
       </Modal>
 
       {/* ── COLLECT PAYMENT MODAL ─────────────────────────────────────────── */}
-      <Modal open={!!collectModal} onClose={() => setCollectModal(null)} title="💳 Collect Payment">
+      <Modal open={!!collectModal} onClose={() => setCollectModal(null)} title="Collect Payment">
         {collectModal && (
           <div className="text-center py-4">
             <p className="text-sm text-muted mb-1">{collectModal.order_number}</p>
             <p className="font-display font-black text-4xl text-green2">{formatINR(collectModal.total_amount)}</p>
             <p className="text-sm text-muted mt-1">Including GST</p>
             <div className="flex gap-2 justify-center mt-6">
-              {[['cash','💵 Cash'],['upi','📱 UPI'],['card','💳 Card'],['online','🌐 Online']].map(([m, l]) => (
+              {[['cash','Cash'],['upi','UPI'],['card','Card'],['online','Online']].map(([m, l]) => (
                 <Button key={m} variant="secondary" loading={collectMut.isPending}
                   onClick={() => collectMut.mutate({ id: collectModal.id, method: m })}>
-                  {l}
+                  <PayIcon method={m} className="mr-1.5" />{l}
                 </Button>
               ))}
             </div>

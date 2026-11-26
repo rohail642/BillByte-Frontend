@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Radio, CheckCircle2, XCircle, Ban, Timer, Loader2 } from 'lucide-react'
 import { initiatePayment, pollPaymentStatus, cancelPayment } from '../../api/payments'
 import { formatINR } from '../../utils'
 import Modal from '../ui/Modal'
@@ -10,31 +11,31 @@ const TIMEOUT_SECONDS  = 90
 
 const STATUS_UI = {
   pending: {
-    icon: '📡',
+    icon: <Radio size={44} strokeWidth={1.5} />,
     title: 'Waiting for payment…',
     subtitle: 'Ask customer to tap, insert, or swipe on the terminal',
     color: 'text-blue',
   },
   success: {
-    icon: '✅',
+    icon: <CheckCircle2 size={44} strokeWidth={1.5} />,
     title: 'Payment Successful!',
     subtitle: 'Transaction approved',
     color: 'text-green2',
   },
   failed: {
-    icon: '❌',
+    icon: <XCircle size={44} strokeWidth={1.5} />,
     title: 'Payment Failed',
     subtitle: 'Card declined or transaction rejected',
     color: 'text-red',
   },
   cancelled: {
-    icon: '🚫',
+    icon: <Ban size={44} strokeWidth={1.5} />,
     title: 'Payment Cancelled',
     subtitle: 'Transaction was cancelled',
     color: 'text-muted',
   },
   timeout: {
-    icon: '⏱️',
+    icon: <Timer size={44} strokeWidth={1.5} />,
     title: 'Payment Timed Out',
     subtitle: 'No response from terminal. Please try again.',
     color: 'text-amber',
@@ -161,7 +162,7 @@ export default function PaymentModal({ open, mode, amount, orderId, onSuccess, o
     start()
   }
 
-  const modeLabel = mode === 'card' ? '💳 Card' : '📱 UPI'
+  const modeLabel = mode === 'card' ? 'Card' : 'UPI'
   const ui = STATUS_UI[phase] || STATUS_UI.pending
 
   const isTerminal = phase === 'pending'
@@ -175,10 +176,10 @@ export default function PaymentModal({ open, mode, amount, orderId, onSuccess, o
         <p className="text-xs text-muted mb-6">via Pine Labs terminal</p>
 
         {/* Status icon */}
-        <div className="text-5xl mb-3">
+        <div className={`mb-3 flex justify-center ${phase === 'initiating' ? 'text-muted' : ui.color}`}>
           {phase === 'initiating'
-            ? <span className="inline-block animate-spin">⚙️</span>
-            : <span>{ui.icon}</span>}
+            ? <Loader2 size={44} strokeWidth={1.5} className="animate-spin" />
+            : ui.icon}
         </div>
 
         {/* Status text */}

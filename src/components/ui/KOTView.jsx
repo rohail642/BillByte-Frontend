@@ -151,7 +151,7 @@ export function KOTModal({ data, onClose }) {
     <Modal
       open={!!data}
       onClose={onClose}
-      title="🍽️ KOT"
+      title="KOT"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Close</Button>

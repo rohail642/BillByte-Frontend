@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { LogOut, Clock, UtensilsCrossed, ShoppingBag, Bike } from 'lucide-react'
+import { LogOut, Clock, UtensilsCrossed, ShoppingBag, Bike, ChefHat, AlertTriangle, StickyNote } from 'lucide-react'
 import { clsx } from 'clsx'
 import toast from 'react-hot-toast'
 import { getOrders, updateKotStatus } from '../api/orders'
@@ -127,7 +127,7 @@ export default function KitchenDisplay() {
           </div>
         ) : cards.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <span className="text-6xl opacity-20">👨‍🍳</span>
+            <ChefHat size={56} strokeWidth={1.25} className="text-muted opacity-40" />
             <p className="font-display font-bold text-text2 text-lg">All clear</p>
             <p className="text-sm text-muted">No active orders right now</p>
           </div>
@@ -197,7 +197,7 @@ function KotCard({ card, onAdvance, isLoading }) {
         )}>
           <Clock size={11} />
           <span>{timeAgo(kotTimestamp)}</span>
-          {isOld && <span className="text-red">⚠</span>}
+          {isOld && <AlertTriangle size={11} className="text-red" />}
         </div>
       </div>
 
@@ -247,7 +247,7 @@ function KotCard({ card, onAdvance, isLoading }) {
       {/* This round's own note (kot_info); older orders only have order.notes */}
       {(order.kot_info ? order.kot_info[String(kotNumber)]?.note : order.notes) && (
         <p className="mx-4 mb-3 text-xs text-muted bg-surface2 rounded-lg px-3 py-2">
-          📝 {order.kot_info ? order.kot_info[String(kotNumber)]?.note : order.notes}
+          <StickyNote size={12} className="inline-block mr-1 align-[-2px]" />{order.kot_info ? order.kot_info[String(kotNumber)]?.note : order.notes}
         </p>
       )}
 

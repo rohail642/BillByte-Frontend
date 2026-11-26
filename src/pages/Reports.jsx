@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import PayIcon from '../components/ui/PayIcon'
 import { useQuery } from '@tanstack/react-query'
 import { getSalesReport, getTopDishes, getRevenueTrend } from '../api/reports'
 import { getOrders } from '../api/orders'
@@ -8,7 +9,7 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import { formatINR } from '../utils'
-import { Download, Calendar } from 'lucide-react'
+import { Download, Calendar, BarChart3, Receipt, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 function download(content, filename, type) {
@@ -43,7 +44,6 @@ function inr(v) { return Number(v || 0).toFixed(2) }
 const PERIODS = ['today', 'week', 'month']
 const COLORS  = ['#16a34a', '#2563eb', '#ea580c', '#7c3aed', '#d97706']
 const PAYMENT_COLORS = { cash: '#16a34a', upi: '#2563eb', card: '#7c3aed' }
-const PAYMENT_EMOJI  = { cash: '💵', upi: '📱', card: '💳' }
 
 const RevenueTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -165,7 +165,7 @@ export default function Reports() {
 
       const suffix = from ? `${from}-to-${to}` : 'all'
       download('﻿' + toCSV(rows), `BillByte-Orders-${suffix}.csv`, 'text/csv;charset=utf-8;')
-      toast.success(`✅ ${orders.length} orders exported`, { id: 'export' })
+      toast.success(`${orders.length} orders exported`, { id: 'export' })
     } catch (e) { toast.error('Export failed', { id: 'export' })
     } finally { setExporting(false) }
   }
@@ -218,7 +218,7 @@ export default function Reports() {
 
       const suffix = from ? `${from}-to-${to}` : 'all'
       download('﻿' + toCSV(rows), `BillByte-GST-${suffix}.csv`, 'text/csv;charset=utf-8;')
-      toast.success(`✅ GST report exported — ${filtered.length} orders`, { id: 'gst' })
+      toast.success(`GST report exported — ${filtered.length} orders`, { id: 'gst' })
     } catch { toast.error('GST export failed', { id: 'gst' })
     } finally { setExportingGST(false) }
   }
@@ -247,7 +247,7 @@ export default function Reports() {
       ]
 
       download('﻿' + toCSV(rows), `BillByte-Inventory-${getExportRange('today').to}.csv`, 'text/csv;charset=utf-8;')
-      toast.success(`✅ Inventory exported — ${data.total_items} items`, { id: 'inv' })
+      toast.success(`Inventory exported — ${data.total_items} items`, { id: 'inv' })
     } catch { toast.error('Inventory export failed', { id: 'inv' })
     } finally { setExportingInv(false) }
   }
@@ -372,7 +372,7 @@ export default function Reports() {
           <button onClick={exportCSV} disabled={exporting}
             className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface2 hover:border-green/40 hover:bg-green-dim transition-all text-left disabled:opacity-50 group">
             <div className="w-9 h-9 rounded-xl bg-green-dim flex items-center justify-center flex-shrink-0">
-              <span className="text-base">📊</span>
+              <BarChart3 size={16} className="text-text2" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-text">Orders Report</p>
@@ -384,7 +384,7 @@ export default function Reports() {
           <button onClick={exportGST} disabled={exportingGST}
             className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface2 hover:border-blue/40 hover:bg-blue-dim transition-all text-left disabled:opacity-50 group">
             <div className="w-9 h-9 rounded-xl bg-blue-dim flex items-center justify-center flex-shrink-0">
-              <span className="text-base">🧾</span>
+              <Receipt size={16} className="text-text2" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-text">GST Summary</p>
@@ -396,7 +396,7 @@ export default function Reports() {
           <button onClick={exportInventory} disabled={exportingInv}
             className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface2 hover:border-orange/40 hover:bg-orange-dim transition-all text-left disabled:opacity-50 group">
             <div className="w-9 h-9 rounded-xl bg-orange-dim flex items-center justify-center flex-shrink-0">
-              <span className="text-base">📦</span>
+              <Package size={16} className="text-text2" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-text">Inventory</p>
@@ -485,11 +485,10 @@ export default function Reports() {
                 {paymentEntries.map(([method, count]) => {
                   const pct = totalPaymentOrders ? Math.round(count / totalPaymentOrders * 100) : 0
                   const color = PAYMENT_COLORS[method] || '#6b7280'
-                  const emoji = PAYMENT_EMOJI[method] || '💰'
                   return (
                     <div key={method}>
                       <div className="flex justify-between text-xs mb-1.5">
-                        <span className="font-semibold text-text capitalize">{emoji} {method}</span>
+                        <span className="font-semibold text-text capitalize flex items-center gap-1.5"><PayIcon method={method} size={13} /> {method}</span>
                         <span className="text-muted">{count} orders · {pct}%</span>
                       </div>
                       <div className="h-1.5 bg-surface2 rounded-full overflow-hidden">

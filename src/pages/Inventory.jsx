@@ -16,7 +16,7 @@ import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
 import { formatINR } from '../utils'
-import { Plus, RefreshCw, AlertTriangle, Clock, Trash2, Pencil, History, Minus, Users } from 'lucide-react'
+import { Plus, RefreshCw, AlertTriangle, Clock, Trash2, Pencil, History, Minus, Users, Package, CheckCircle2, BarChart3, ClipboardList, Store, Phone, Mail, MapPin } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = ['Stock', 'Alerts', 'Usage History', 'Purchase Orders', 'Suppliers']
@@ -108,7 +108,7 @@ export default function Inventory() {
         <div className="space-y-3">
           <div className="flex flex-wrap gap-3 items-center">
             <input className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
-              placeholder="🔍 Search stock..." value={search} onChange={e => setSearch(e.target.value)} />
+              placeholder="Search stock..." value={search} onChange={e => setSearch(e.target.value)} />
             <Button variant="secondary" size="sm" icon={<RefreshCw size={13}/>} onClick={refetchAll}>Refresh</Button>
             <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openAdd}>Add Item</Button>
           </div>
@@ -138,7 +138,7 @@ export default function Inventory() {
                           <td className="py-2.5 px-2">
                             {item.expiry_date ? (
                               <span className={clsx('text-xs font-semibold', item.is_expired ? 'text-red' : item.is_expiring_soon ? 'text-orange' : 'text-text3')}>
-                                {item.is_expired ? '❌ Expired' : item.is_expiring_soon ? `⚠ ${expiryDays}d` : new Date(item.expiry_date).toLocaleDateString('en-IN', {day:'2-digit',month:'short'})}
+                                {item.is_expired ? 'Expired' : item.is_expiring_soon ? `${expiryDays}d left` : new Date(item.expiry_date).toLocaleDateString('en-IN', {day:'2-digit',month:'short'})}
                               </span>
                             ) : <span className="text-muted text-xs">—</span>}
                           </td>
@@ -178,7 +178,7 @@ export default function Inventory() {
                     })}
                   </tbody>
                 </table>
-                {filtered.length === 0 && <EmptyState icon="📦" title="No stock items" description="Add your first item to get started" />}
+                {filtered.length === 0 && <EmptyState icon={<Package />} title="No stock items" description="Add your first item to get started" />}
               </div>
             </Card>
           )}
@@ -194,14 +194,14 @@ export default function Inventory() {
               <AlertTriangle size={15}/> Low Stock ({alerts?.low_stock_count || 0})
             </h3>
             {(alerts?.low_stock_items || []).length === 0
-              ? <p className="text-sm text-muted">All stock levels are healthy ✅</p>
+              ? <p className="text-sm text-muted flex items-center gap-1.5"><CheckCircle2 size={14} className="text-green" /> All stock levels are healthy</p>
               : (alerts.low_stock_items).map(item => (
                 <div key={item.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-text">{item.name}</p>
                     <p className="text-xs text-muted">Has {item.quantity} {item.unit} · Min required: {item.min_quantity} {item.unit}</p>
                   </div>
-                  <Badge color="orange">⚠ Low</Badge>
+                  <Badge color="orange">Low</Badge>
                   <Button variant="primary" size="xs" icon={<Plus size={11}/>}
                     onClick={() => { setForm({ id: item.id, name: item.name, unit: item.unit, qty: '' }); setModal('restock') }}>
                     Restock
@@ -216,7 +216,7 @@ export default function Inventory() {
               <Clock size={15}/> Expiring Soon / Expired ({(alerts?.expiring_soon_count || 0) + (alerts?.expired_count || 0)})
             </h3>
             {[...(alerts?.expired_items||[]), ...(alerts?.expiring_items||[])].length === 0
-              ? <p className="text-sm text-muted">No expiry alerts ✅</p>
+              ? <p className="text-sm text-muted flex items-center gap-1.5"><CheckCircle2 size={14} className="text-green" /> No expiry alerts</p>
               : [...(alerts?.expired_items||[]), ...(alerts?.expiring_items||[])].map(item => {
                 const expiryDays = item.expiry_date ? Math.ceil((new Date(item.expiry_date) - new Date()) / 86400000) : null
                 return (
@@ -243,7 +243,7 @@ export default function Inventory() {
         <Card>
           <h3 className="font-display font-bold text-sm text-text mb-4">Daily Usage — Last 7 Days</h3>
           {(usageSummary || []).length === 0
-            ? <EmptyState icon="📊" title="No usage data yet" description="Usage is tracked automatically when stock is deducted" />
+            ? <EmptyState icon={<BarChart3 />} title="No usage data yet" description="Usage is tracked automatically when stock is deducted" />
             : (
               <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -301,7 +301,7 @@ export default function Inventory() {
                 </div>
               </Card>
             ))}
-            {(pos||[]).length === 0 && <EmptyState icon="📋" title="No purchase orders" description="Create your first PO to track supplier orders" />}
+            {(pos||[]).length === 0 && <EmptyState icon={<ClipboardList />} title="No purchase orders" description="Create your first PO to track supplier orders" />}
           </div>
         </div>
       )}
@@ -316,7 +316,7 @@ export default function Inventory() {
             </Button>
           </div>
           {(suppliers||[]).length === 0
-            ? <EmptyState icon="🏪" title="No suppliers yet" description="Add suppliers to track where you order from" />
+            ? <EmptyState icon={<Store />} title="No suppliers yet" description="Add suppliers to track where you order from" />
             : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {(suppliers||[]).map(s => (
@@ -327,9 +327,9 @@ export default function Inventory() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm text-text">{s.name}</p>
-                        {s.phone && <p className="text-xs text-muted">📞 {s.phone}</p>}
-                        {s.email && <p className="text-xs text-muted">✉️ {s.email}</p>}
-                        {s.address && <p className="text-xs text-muted">📍 {s.address}</p>}
+                        {s.phone && <p className="text-xs text-muted flex items-center gap-1.5"><Phone size={11} /> {s.phone}</p>}
+                        {s.email && <p className="text-xs text-muted flex items-center gap-1.5"><Mail size={11} /> {s.email}</p>}
+                        {s.address && <p className="text-xs text-muted flex items-center gap-1.5"><MapPin size={11} /> {s.address}</p>}
                         {s.notes && <p className="text-xs text-muted italic mt-1">{s.notes}</p>}
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -354,7 +354,7 @@ export default function Inventory() {
 
       {/* Add/Edit item */}
       <Modal open={modal==='add'||modal==='edit'} onClose={()=>setModal(null)}
-        title={modal==='add' ? '✚ Add Stock Item' : '✏️ Edit Item'}
+        title={modal==='add' ? 'Add Stock Item' : 'Edit Item'}
         footer={<>
           <Button variant="secondary" onClick={()=>setModal(null)}>Cancel</Button>
           <Button variant="primary"
@@ -428,7 +428,7 @@ export default function Inventory() {
       {/* Usage history for specific item */}
       <Modal open={modal==='usage'} onClose={()=>{setModal(null);setSelectedItem(null)}} title={`Usage History: ${selectedItem?.name}`} size="lg">
         {!itemUsage ? <div className="flex justify-center py-8"><Spinner/></div> : itemUsage.length === 0
-          ? <EmptyState icon="📊" title="No usage history" description="Usage will appear here once stock is deducted"/>
+          ? <EmptyState icon={<BarChart3 />} title="No usage history" description="Usage will appear here once stock is deducted"/>
           : (
             <table className="w-full text-sm">
               <thead><tr className="border-b border-border">
@@ -481,7 +481,7 @@ export default function Inventory() {
 
       {/* Add/Edit Supplier */}
       <Modal open={modal==='supplier'||modal==='editSupplier'} onClose={()=>setModal(null)}
-        title={modal==='supplier' ? '🏪 Add Supplier' : '✏️ Edit Supplier'}
+        title={modal==='supplier' ? 'Add Supplier' : 'Edit Supplier'}
         footer={<>
           <Button variant="secondary" onClick={()=>setModal(null)}>Cancel</Button>
           <Button variant="primary" loading={createSupMut.isPending||updateSupMut.isPending}

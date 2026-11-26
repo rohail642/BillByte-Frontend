@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import PayIcon from '../components/ui/PayIcon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getOrders, updateStatus, collectPayment } from '../api/orders'
 import { getProfile } from '../api/auth'
@@ -10,7 +11,7 @@ import Modal from '../components/ui/Modal'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
 import { formatINR, statusColor, printKOTElectron, isNativeApp } from '../utils'
-import { CreditCard, RefreshCw, X, ChevronDown, Printer, UtensilsCrossed } from 'lucide-react'
+import { CreditCard, RefreshCw, X, ChevronDown, Printer, UtensilsCrossed, ClipboardList } from 'lucide-react'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 import { KOTModal } from '../components/ui/KOTView'
 import { QrPendingStrip } from '../components/qr/QrRequests'
@@ -23,7 +24,6 @@ const FILTERS = [
   { key: 'ready',   label: 'Ready',  statuses: ['ready','served'] },
   { key: 'paid',    label: 'Paid',   statuses: ['paid'] },
 ]
-const PAY_ICONS = { cash:'💵', upi:'📱', card:'💳', print:'🖨️' }
 
 export default function Orders() {
   const qc = useQueryClient()
@@ -56,7 +56,7 @@ export default function Orders() {
   const payMut = useMutation({
     mutationFn: ({ id, method }) => collectPayment(id, { payment_method: method, discount_percent: 0 }),
     onSuccess: (paidOrder) => {
-      toast.success('✅ Payment collected!')
+      toast.success('Payment collected')
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['orders', 'live'] })
       qc.invalidateQueries({ queryKey: ['summary'] })
@@ -140,7 +140,7 @@ export default function Orders() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" /></div>
       ) : filteredOrders.length === 0 ? (
-        <EmptyState icon="📋" title="No orders found" description="Orders will appear here once created" />
+        <EmptyState icon={<ClipboardList />} title="No orders found" description="Orders will appear here once created" />
       ) : (
         <div className="space-y-2">
           {filteredOrders.map(order => (
@@ -154,7 +154,7 @@ export default function Orders() {
                     {order.platform === 'qr' && <Badge color="purple">QR</Badge>}
                     <Badge color={order.payment_status === 'paid' ? 'green' : 'orange'}>
                       {order.payment_status === 'paid'
-                        ? `${PAY_ICONS[order.payment_method] || '💳'} ${order.payment_method?.toUpperCase() || 'PAID'}`
+                        ? <><PayIcon method={order.payment_method} size={11} className="mr-1" />{order.payment_method?.toUpperCase() || 'PAID'}</>
                         : 'Unpaid'}
                     </Badge>
                   </div>
@@ -249,7 +249,7 @@ export default function Orders() {
                       {order.discount_amount > 0 && <div>Discount: -{formatINR(order.discount_amount)}</div>}
                       {order.payment_method && (
                         <div className="text-green2 font-semibold">
-                          Paid via {PAY_ICONS[order.payment_method]} {order.payment_method?.toUpperCase()}
+                          Paid via <PayIcon method={order.payment_method} size={12} className="mx-0.5" /> {order.payment_method?.toUpperCase()}
                         </div>
                       )}
                     </div>
@@ -265,7 +265,7 @@ export default function Orders() {
       )}
 
       {/* Pay modal */}
-      <Modal open={!!payModal} onClose={() => setPayModal(null)} title="💳 Collect Payment">
+      <Modal open={!!payModal} onClose={() => setPayModal(null)} title="Collect Payment">
         {payModal && (
           <div className="text-center py-4">
             <p className="text-sm text-muted mb-1">{payModal.order_number}</p>
@@ -275,10 +275,10 @@ export default function Orders() {
               <p className="text-xs text-orange mt-0.5">Discount applied: -{formatINR(payModal.discount_amount)}</p>
             )}
             <div className="flex gap-2 justify-center mt-6">
-              {[['cash','💵 Cash'],['upi','📱 UPI'],['card','💳 Card']].map(([m, l]) => (
+              {[['cash','Cash'],['upi','UPI'],['card','Card']].map(([m, l]) => (
                 <Button key={m} variant="secondary" loading={payMut.isPending}
                   onClick={() => payMut.mutate({ id: payModal.id, method: m })}>
-                  {l}
+                  <PayIcon method={m} className="mr-1.5" />{l}
                 </Button>
               ))}
             </div>
@@ -287,7 +287,7 @@ export default function Orders() {
       </Modal>
 
       {/* Receipt modal */}
-      <Modal open={!!receiptModal} onClose={() => setReceiptModal(null)} title="🧾 Receipt">
+      <Modal open={!!receiptModal} onClose={() => setReceiptModal(null)} title="Receipt">
         {receiptModal && (
           <div>
             <ReceiptView order={receiptModal} profile={profile} />

@@ -3,7 +3,7 @@ import { getDashboardSummary, getOrders, getActiveTables } from '../api/orders'
 import { getRevenueTrend, getTopDishes } from '../api/reports'
 import { getInventory } from '../api/inventory'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { TrendingUp, ShoppingBag, Receipt, LayoutGrid } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Receipt, LayoutGrid, AlertTriangle, User } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -183,7 +183,7 @@ export default function Dashboard() {
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-text2 font-medium">{item.name}</span>
                     <span className={item.is_low_stock ? 'text-orange font-bold' : 'text-green font-bold'}>
-                      {item.quantity} {item.unit}{item.is_low_stock ? ' ⚠' : ''}
+                      {item.quantity} {item.unit}{item.is_low_stock && <AlertTriangle size={11} className="inline ml-1 -mt-0.5 text-orange" />}
                     </span>
                   </div>
                   <div className="h-1.5 bg-surface2 rounded-full overflow-hidden">
@@ -266,11 +266,11 @@ export default function Dashboard() {
 
       {/* Table modal */}
       <Modal open={!!tableModal} onClose={() => { setTableModal(null); setTableOrder(null) }}
-        title={`🪑 Table ${tableModal}`} size="lg">
+        title={`Table ${tableModal}`} size="lg">
         {tableOrder ? (
           <div className="space-y-4">
             {tableOrder.customer_name && (
-              <p className="text-xs text-muted">👤 {tableOrder.customer_name}</p>
+              <p className="text-xs text-muted flex items-center gap-1"><User size={12} /> {tableOrder.customer_name}</p>
             )}
 
             {/* All items across all orders for this table */}

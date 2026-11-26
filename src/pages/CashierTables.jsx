@@ -7,7 +7,7 @@ import { getMenuItems, getCategories } from '../api/menu'
 import { getProfile } from '../api/auth'
 import { lookupCustomer } from '../api/customers'
 import toast from 'react-hot-toast'
-import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer, ArrowLeft, RefreshCw } from 'lucide-react'
+import { X, Plus, Minus, Search, ChefHat, UtensilsCrossed, Receipt, Printer, ArrowLeft, RefreshCw, AlertTriangle } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatINR, printKOTElectron, isNativeApp } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
@@ -310,12 +310,12 @@ export default function CashierTables() {
             <button onClick={() => setMobileTab('menu')}
               className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all',
                 mobileTab === 'menu' ? 'bg-green text-white' : 'text-text2')}>
-              🍽️ Menu
+              <UtensilsCrossed size={14} className="inline -mt-0.5 mr-1" />Menu
             </button>
             <button onClick={() => setMobileTab('order')}
               className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all',
                 mobileTab === 'order' ? 'bg-green text-white' : 'text-text2')}>
-              🧾 Order {cart.length > 0 && (
+              <Receipt size={14} className="inline -mt-0.5 mr-1" />Order {cart.length > 0 && (
                 <span className="ml-1 bg-red text-white text-[9px] rounded-full w-4 h-4 inline-flex items-center justify-center">{cart.length}</span>
               )}
             </button>
@@ -679,7 +679,7 @@ export default function CashierTables() {
       {/* Station notification alert */}
       {cancelNotifyId && (
         <div className="fixed bottom-4 right-4 z-50 bg-orange border border-orange/30 rounded-xl px-4 py-3 shadow-lg max-w-xs">
-          <p className="text-xs font-semibold text-orange mb-1.5">⚠ Printer may be offline</p>
+          <p className="text-xs font-semibold text-orange mb-1.5 flex items-center gap-1"><AlertTriangle size={12} /> Printer may be offline</p>
           <p className="text-[10px] text-text2 mb-2">Please notify the kitchen station verbally as a fallback.</p>
           <button
             onClick={() => retryNotifyMut.mutate()}

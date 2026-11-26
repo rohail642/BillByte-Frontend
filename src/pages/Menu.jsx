@@ -13,7 +13,7 @@ import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
 import Toggle from '../components/ui/Toggle'
-import { Plus, Minus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags, Upload, AlertTriangle } from 'lucide-react'
+import { Plus, Minus, Pencil, Trash2, Eye, EyeOff, ChefHat, UtensilsCrossed, X, Tags, Upload, AlertTriangle, Lightbulb } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const TABS = [
@@ -184,7 +184,7 @@ export default function Menu() {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <input className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
-              placeholder="🔍 Search menu..." value={search} onChange={e => setSearch(e.target.value)} />
+              placeholder="Search menu..." value={search} onChange={e => setSearch(e.target.value)} />
             <div className="flex items-center gap-1">
               <select className="bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-green cursor-pointer"
                 value={catFilter} onChange={e => setCatFilter(e.target.value)}>
@@ -308,7 +308,7 @@ export default function Menu() {
           </div>
 
           {(recipes||[]).length === 0 ? (
-            <EmptyState icon="🍳" title="No recipes yet"
+            <EmptyState icon={<ChefHat />} title="No recipes yet"
               description="Go to Menu Items, hover a dish and click the chef hat icon to add its recipe"
               action={<Button variant="secondary" size="sm" onClick={() => setTab('items')}>Go to Menu Items →</Button>} />
           ) : (
@@ -353,7 +353,7 @@ export default function Menu() {
       )}
 
       {/* ── IMPORT EXCEL FORMAT GUIDE ───────────────────────────────── */}
-      <Modal open={importHelp} onClose={() => setImportHelp(false)} title="📄 Import Menu from Excel" size="lg"
+      <Modal open={importHelp} onClose={() => setImportHelp(false)} title="Import Menu from Excel" size="lg"
         footer={<>
           <Button variant="secondary" onClick={() => setImportHelp(false)}>Cancel</Button>
           <Button variant="primary" icon={<Upload size={14}/>}
@@ -409,7 +409,7 @@ export default function Menu() {
       </Modal>
 
       {/* ── MANAGE CATEGORIES MODAL ─────────────────────────────────── */}
-      <Modal open={catModal} onClose={() => { setCatModal(false); setNewCatName('') }} title="🏷️ Manage Categories">
+      <Modal open={catModal} onClose={() => { setCatModal(false); setNewCatName('') }} title="Manage Categories">
         <div className="space-y-4">
           <div className="flex gap-2">
             <input
@@ -462,7 +462,7 @@ export default function Menu() {
 
       {/* ── ADD/EDIT ITEM MODAL ──────────────────────────────────────── */}
       <Modal open={!!itemModal} onClose={() => setItemModal(null)}
-        title={itemModal === 'add' ? '✚ Add Menu Item' : '✏️ Edit Item'}
+        title={itemModal === 'add' ? 'Add Menu Item' : 'Edit Item'}
         footer={<>
           <Button variant="secondary" onClick={() => setItemModal(null)}>Cancel</Button>
           <Button variant="primary" loading={createMut.isPending||updateMut.isPending}
@@ -509,7 +509,7 @@ export default function Menu() {
 
       {/* ── RECIPE MODAL ─────────────────────────────────────────────── */}
       <Modal open={!!recipeModal} onClose={() => setRecipeModal(null)} size="lg"
-        title={`🍳 Recipe — ${recipeModal?.emoji || ''} ${recipeModal?.name || ''}`}
+        title={`Recipe — ${recipeModal?.name || ''}`}
         footer={<>
           <Button variant="secondary" onClick={() => setRecipeModal(null)}>Cancel</Button>
           <Button variant="primary" loading={recipeMut.isPending} onClick={saveRecipeHandler}>
@@ -518,7 +518,7 @@ export default function Menu() {
         </>}>
         <div className="space-y-4">
           <div className="bg-green-dim border border-green/20 rounded-lg px-3 py-2.5 text-xs text-green2">
-            💡 When a KOT is sent for this dish, these quantities will be automatically deducted from your inventory.
+            <Lightbulb size={13} className="inline -mt-0.5 mr-1" />When a KOT is sent for this dish, these quantities will be automatically deducted from your inventory.
           </div>
 
           {/* Ingredient rows */}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { ChevronLeft, ChevronRight, Download, AlertTriangle, Check, Undo2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, AlertTriangle, Check, Undo2, Wallet } from 'lucide-react'
 import { clsx } from 'clsx'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
@@ -113,7 +113,7 @@ export default function SalarySheet({ onOpen }) {
       </div>
 
       {data.rows.length === 0 ? (
-        <EmptyState icon="💰" title="No staff for this month" description="Add your team in the Team tab." />
+        <EmptyState icon={<Wallet />} title="No staff for this month" description="Add your team in the Team tab." />
       ) : (
         <Card className="p-0 overflow-x-auto">
           <table className="w-full text-sm min-w-[760px]">

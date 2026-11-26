@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import PayIcon from '../components/ui/PayIcon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMenuItems, getCategories } from '../api/menu'
 import { createOrder, addItemsToOrder, collectPayment, updateStatus, getActiveTables } from '../api/orders'
@@ -11,7 +12,7 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
-import { Plus, Minus, Trash2, UtensilsCrossed, Send, Printer } from 'lucide-react'
+import { Plus, Minus, Trash2, UtensilsCrossed, Send, Printer, CheckCircle2, Receipt, X, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { formatINR, printKOTElectron, isNativeApp } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
@@ -19,7 +20,6 @@ import { clsx } from 'clsx'
 import ReceiptView, { printReceipt } from '../components/ui/ReceiptView'
 import PaymentModal from '../components/payments/PaymentModal'
 
-const PAY_ICONS = { cash: '💵', upi: '📱', card: '💳' }
 
 // ── POS Terminal — full-screen wrapper around the same billing UI ──────────────
 export default function POSTerminal() {
@@ -149,8 +149,8 @@ export default function POSTerminal() {
     onSuccess: ({ order, showReceipt, kotItems, kotTable, kotName, kotNote }) => {
       toast.success(
         order.payment_method
-          ? `✅ Payment done — #${order.order_number}`
-          : `📋 KOT sent — #${order.order_number}`
+          ? `Payment done — #${order.order_number}`
+          : `KOT sent — #${order.order_number}`
       )
       const kotData = {
         restaurantName: profile?.restaurant_name || '',
@@ -215,7 +215,7 @@ export default function POSTerminal() {
     const { order, showReceipt } = pinelabsModal || {}
     if (!order) return
     const paidOrder = { ...order, payment_method: payMode, payment_status: 'paid', status: 'paid' }
-    toast.success(`✅ ${payMode === 'card' ? 'Card' : 'UPI'} payment approved — #${order.order_number}`)
+    toast.success(`${payMode === 'card' ? 'Card' : 'UPI'} payment approved — #${order.order_number}`)
     cart.clearCart()
     setFoundCustomer(null)
     setNotFound(false)
@@ -244,12 +244,12 @@ export default function POSTerminal() {
             <button onClick={() => setMobileTab('menu')}
               className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all',
                 mobileTab === 'menu' ? 'bg-green text-white' : 'text-text2')}>
-              🍽️ Menu
+              <UtensilsCrossed size={14} className="inline -mt-0.5 mr-1" />Menu
             </button>
             <button onClick={() => setMobileTab('bill')}
               className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all relative',
                 mobileTab === 'bill' ? 'bg-green text-white' : 'text-text2')}>
-              🧾 Bill {cart.items.length > 0 && (
+              <Receipt size={14} className="inline -mt-0.5 mr-1" />Bill {cart.items.length > 0 && (
                 <span className="ml-1 bg-red text-white text-[9px] rounded-full w-4 h-4 inline-flex items-center justify-center">{cart.items.length}</span>
               )}
             </button>
@@ -261,7 +261,7 @@ export default function POSTerminal() {
               <div className="flex items-center justify-between flex-shrink-0">
                 <h3 className="font-display font-bold text-sm text-text">Active Tables</h3>
                 <button onClick={() => { setActiveTableView(false); setSelectedTable(null) }}
-                  className="text-xs text-muted hover:text-text transition-colors">✕</button>
+                  className="text-muted hover:text-text transition-colors" aria-label="Close"><X size={14} /></button>
               </div>
               <div className="flex-1 overflow-y-auto space-y-2">
                 {(activeTables || []).length === 0 ? (
@@ -278,7 +278,7 @@ export default function POSTerminal() {
                       <p className="font-display font-bold text-sm text-text">Table {table.table_number}</p>
                       <p className="font-bold text-xs text-green2">{formatINR(table.total_amount)}</p>
                     </div>
-                    {table.customer_name && <p className="text-[10px] text-muted mb-1">👤 {table.customer_name}</p>}
+                    {table.customer_name && <p className="text-[10px] text-muted mb-1"><User size={10} className="inline -mt-0.5 mr-0.5" />{table.customer_name}</p>}
                     <p className="text-[10px] text-muted">{table.items_count} items · {table.orders.length} KOT</p>
 
                     {selectedTable?.table_number === table.table_number && (
@@ -317,7 +317,7 @@ export default function POSTerminal() {
               <div className="flex gap-2">
                 <input
                   className="flex-1 bg-surface2 border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-colors"
-                  placeholder="🔍  Search menu..."
+                  placeholder="Search menu..."
                   value={search} onChange={e => setSearch(e.target.value)}
                 />
               </div>
@@ -407,7 +407,7 @@ export default function POSTerminal() {
                   onChange={e => cart.setGuestName(e.target.value)}
                 />
               </div>
-              {lookingUp && <p className="text-[10px] text-muted animate-pulse">🔍 Looking up customer...</p>}
+              {lookingUp && <p className="text-[10px] text-muted animate-pulse">Looking up customer...</p>}
               {notFound && !lookingUp && cart.customerName.length >= 10 && (
                 <div className="bg-orange-dim border border-orange/20 rounded-lg px-3 py-2 flex items-center justify-between">
                   <p className="text-xs text-orange font-semibold">No customer found</p>
@@ -421,7 +421,7 @@ export default function POSTerminal() {
               {foundCustomer && (
                 <div className="bg-green-dim border border-green/20 rounded-lg px-3 py-2 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-bold text-green2">✅ {foundCustomer.name}</p>
+                    <p className="text-xs font-bold text-green2 flex items-center gap-1"><CheckCircle2 size={12} /> {foundCustomer.name}</p>
                     <p className="text-[10px] text-green2">{foundCustomer.loyalty_points} pts available (= ₹{Math.floor(foundCustomer.loyalty_points / 10)} off)</p>
                   </div>
                   {foundCustomer.loyalty_points >= 100 && (
@@ -442,7 +442,7 @@ export default function POSTerminal() {
                           const discPct = Math.floor((discountRupees / sub) * 100)
                           cart.setDiscount(discPct)
                           setPointsApplied(true)
-                          toast.success(`🎁 ${ptsToUse} points applied = ₹${discountRupees} off!`)
+                          toast.success(`${ptsToUse} points applied: ₹${discountRupees} off`)
                         }}>
                         Apply Points
                       </button>
@@ -519,7 +519,7 @@ export default function POSTerminal() {
                       readOnly={pointsApplied}
                       onChange={e => !pointsApplied && cart.setDiscount(Number(e.target.value))} />
                     {pointsApplied && (
-                      <span className="absolute -top-4 left-0 text-[9px] text-green2 font-bold whitespace-nowrap">🎁 Points applied</span>
+                      <span className="absolute -top-4 left-0 text-[9px] text-green2 font-bold whitespace-nowrap">Points applied</span>
                     )}
                   </div>
                   <input placeholder="Coupon"
@@ -546,10 +546,10 @@ export default function POSTerminal() {
           </div>
 
           {/* Add Customer Modal */}
-          <Modal open={addCustModal} onClose={() => setAddCustModal(false)} title="➕ New Customer">
+          <Modal open={addCustModal} onClose={() => setAddCustModal(false)} title="New Customer">
             <div className="space-y-3">
               <div className="bg-surface2 rounded-lg px-3 py-2 text-sm text-text2">
-                📱 Phone: <strong>{cart.customerName}</strong>
+                Phone: <strong>{cart.customerName}</strong>
               </div>
               <Input label="Customer Name" placeholder="e.g. Priya Sharma"
                 value={custName} onChange={e => setCustName(e.target.value)} />
@@ -564,7 +564,7 @@ export default function POSTerminal() {
                       setFoundCustomer({ ...res, loyalty_points: 0 })
                       setNotFound(false)
                       setAddCustModal(false)
-                      toast.success(`✅ ${custName} added!`)
+                      toast.success(`${custName} added`)
                     } catch (e) { toast.error(String(e)) }
                     finally { setAddingCust(false) }
                   }}>
@@ -578,14 +578,14 @@ export default function POSTerminal() {
           <Modal
             open={!!payModal}
             onClose={() => setPayModal(false)}
-            title={payModal === 'receipt' ? '🧾 Pay & Get Receipt' : '💳 Collect Payment'}>
+            title={payModal === 'receipt' ? 'Pay & Get Receipt' : 'Collect Payment'}>
             <div className="text-center py-4">
               <p className="font-display font-black text-4xl text-green2">{formatINR(total)}</p>
               <p className="text-sm text-muted mt-1">Including {cart.gstRate}% GST</p>
               {discount > 0 && <p className="text-xs text-orange mt-0.5">Discount: -{formatINR(discount)}</p>}
               <p className="text-xs text-muted mt-3 mb-1">Select payment method</p>
               <div className="flex gap-2 justify-center mt-2">
-                {[['cash','💵 Cash'],['upi','📱 UPI'],['card','💳 Card']].map(([m, l]) => (
+                {[['cash','Cash'],['upi','UPI'],['card','Card']].map(([m, l]) => (
                   <Button key={m} variant="secondary"
                     loading={submitOrder.isPending || createOrderForTerminal.isPending}
                     onClick={() => {
@@ -596,7 +596,7 @@ export default function POSTerminal() {
                         submitOrder.mutate({ payMethod: m, showReceipt: payModal === 'receipt' })
                       }
                     }}>
-                    {l}{profile?.pinelabs_enabled && (m === 'card' || m === 'upi') ? ' →' : ''}
+                    <PayIcon method={m} className="mr-1.5" />{l}{profile?.pinelabs_enabled && (m === 'card' || m === 'upi') ? ' →' : ''}
                   </Button>
                 ))}
               </div>
@@ -619,7 +619,7 @@ export default function POSTerminal() {
           )}
 
           {/* Receipt modal */}
-          <Modal open={!!receiptModal} onClose={() => setReceiptModal(null)} title="🧾 Receipt">
+          <Modal open={!!receiptModal} onClose={() => setReceiptModal(null)} title="Receipt">
             {receiptModal && (
               <div>
                 <ReceiptView order={receiptModal} profile={profile} />

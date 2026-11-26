@@ -103,7 +103,7 @@ function PaySheet({ bill, busy, onClose, onUpi, onCounter }) {
               <button onClick={copy}
                 className={clsx('h-8 px-3 rounded-lg text-xs font-bold border transition-colors flex-shrink-0',
                   copied ? 'bg-green text-white border-green' : 'border-green text-green')}>
-                {copied ? 'Copied ✓' : 'Copy'}
+                {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
             <p className="mt-2 text-[11px] text-text3">After paying, show the payment screen to staff. This page turns to “Paid” once they confirm.</p>

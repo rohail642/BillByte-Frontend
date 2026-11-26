@@ -1,7 +1,7 @@
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { Outlet } from 'react-router-dom'
-import { Clock, Megaphone, X } from 'lucide-react'
+import { Clock, Megaphone, X, BarChart3 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../store/auth'
 import client from '../../api/client'
@@ -128,19 +128,17 @@ export default function AppLayout() {
         const normalized = digits.length === 10 ? `91${digits}` : digits
         const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
         const lines = [
-          `📊 *Daily Summary — ${restaurantName || 'Restaurant'}*`,
-          `📅 ${dateStr}`,
+          `*Daily Summary — ${restaurantName || 'Restaurant'}*`,
+          `${dateStr}`,
           ``,
-          `💰 Revenue: ₹${summary.today_revenue}`,
-          `🧾 Orders: ${summary.today_orders}`,
-          `📊 Avg Bill: ₹${summary.avg_bill}`,
-          ``,
-          `Have a great night! 🌙`,
+          `Revenue: ₹${summary.today_revenue}`,
+          `Orders: ${summary.today_orders}`,
+          `Average bill: ₹${summary.avg_bill}`,
         ]
         const waUrl = `https://wa.me/${normalized}?text=${encodeURIComponent(lines.join('\n'))}`
         toast((t) => (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 13 }}>📊 Daily summary ready</span>
+            <span style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}><BarChart3 size={14} /> Daily summary ready</span>
             <a href={waUrl} target="_blank" rel="noopener noreferrer"
               onClick={() => toast.dismiss(t.id)}
               style={{ background: '#25D366', color: 'white', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>

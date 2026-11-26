@@ -17,7 +17,7 @@ import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
 import { getNotifPrefs, setNotifPref } from '../utils/notifPrefs'
-import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check, Printer, KeyRound, X, QrCode } from 'lucide-react'
+import { Store, Receipt, Link2, Bell, FileText, Users, Plus, Trash2, Pencil, UtensilsCrossed, ShieldCheck, Check, Printer, KeyRound, X, QrCode, BarChart3, CreditCard, Monitor, CheckCircle2 } from 'lucide-react'
 import { clsx } from 'clsx'
 
 // Loaded on demand — pulls in the QR code generator.
@@ -397,7 +397,7 @@ export default function Settings() {
   })
   const tgTestMut = useMutation({
     mutationFn: sendTelegramReportNow,
-    onSuccess: () => { toast.success('Report sent — check Telegram 📬'); refetchTg() },
+    onSuccess: () => { toast.success('Report sent — check Telegram'); refetchTg() },
     onError: e => { toast.error(String(e)); refetchTg() },
   })
   const tgTime = tgStatus
@@ -483,7 +483,7 @@ export default function Settings() {
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">📊</span>
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-dim text-blue"><BarChart3 size={16} /></span>
               <div>
                 <p className="text-sm font-bold text-text">Telegram Daily Reports</p>
                 <p className="text-xs text-muted">Sales summary on Telegram every night at {tgTime} ({tgStatus?.timezone || 'IST'})</p>
@@ -556,7 +556,7 @@ export default function Settings() {
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🔴</span>
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-red-dim"><span className="w-2.5 h-2.5 rounded-full bg-red" /></span>
               <div>
                 <p className="text-sm font-bold text-text">Zomato</p>
                 <p className="text-xs text-muted">Receive orders automatically from Zomato</p>
@@ -590,7 +590,7 @@ export default function Settings() {
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🟠</span>
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-orange-dim"><span className="w-2.5 h-2.5 rounded-full bg-orange" /></span>
               <div>
                 <p className="text-sm font-bold text-text">Swiggy</p>
                 <p className="text-xs text-muted">Receive orders automatically from Swiggy</p>
@@ -624,7 +624,7 @@ export default function Settings() {
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">💳</span>
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-surface2 text-text2"><CreditCard size={16} /></span>
               <div>
                 <p className="text-sm font-bold text-text">Razorpay</p>
                 <p className="text-xs text-muted">Accept UPI / card payments via Razorpay</p>
@@ -652,7 +652,7 @@ export default function Settings() {
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🖥️</span>
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-surface2 text-text2"><Monitor size={16} /></span>
               <div>
                 <p className="text-sm font-bold text-text">Pine Labs Terminal</p>
                 <p className="text-xs text-muted">Card & UPI payments via Pine Labs Plutus</p>
@@ -680,7 +680,7 @@ export default function Settings() {
                 value={form.pinelabs_security_token || ''} onChange={e => set('pinelabs_security_token', e.target.value)} />
               {profile?.pinelabs_merchant_id && (
                 <div className="flex items-center gap-1.5 text-xs text-green2 font-semibold">
-                  <span>✅</span> Terminal credentials saved
+                  <CheckCircle2 size={14} /> Terminal credentials saved
                 </div>
               )}
             </div>
@@ -1158,7 +1158,7 @@ export default function Settings() {
         )}
 
         {/* Add member modal */}
-        <Modal open={teamModal} onClose={() => setTeamModal(false)} title="➕ Add Team Member"
+        <Modal open={teamModal} onClose={() => setTeamModal(false)} title="Add Team Member"
           footer={<>
             <Button variant="secondary" onClick={() => setTeamModal(false)}>Cancel</Button>
             <Button variant="primary" loading={addMut.isPending}
@@ -1180,7 +1180,7 @@ export default function Settings() {
         </Modal>
 
         {/* Edit member modal */}
-        <Modal open={!!editMember} onClose={() => setEditMember(null)} title="✏️ Edit Team Member"
+        <Modal open={!!editMember} onClose={() => setEditMember(null)} title="Edit Team Member"
           footer={<>
             <Button variant="secondary" onClick={() => setEditMember(null)}>Cancel</Button>
             <Button variant="primary" loading={updateMut.isPending}

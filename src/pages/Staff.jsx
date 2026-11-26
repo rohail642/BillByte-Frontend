@@ -110,7 +110,7 @@ export default function Staff() {
 
           {isLoading ? <div className="flex justify-center py-12"><Spinner size="lg" /></div>
             : staff.length === 0
-              ? <EmptyState icon="👨‍🍳" title="No staff yet" description="Add your team to track attendance, advances and salary." />
+              ? <EmptyState icon={<Users />} title="No staff yet" description="Add your team to track attendance, advances and salary." />
               : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {staff.map(m => {

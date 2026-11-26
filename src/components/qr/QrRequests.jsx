@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Check, X, Clock, QrCode, BellRing, Receipt } from 'lucide-react'
+import { Check, X, Clock, QrCode, BellRing, Receipt, CheckCircle2 } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Modal from '../ui/Modal'
@@ -172,7 +172,7 @@ export function QrInbox({ open, onClose, pollMs }) {
             <CallCards calls={calls} />
             <QrRequestCards requests={requests} className="space-y-3" empty={calls.length ? null :
               <div className="py-16 text-center">
-                <p className="text-2xl mb-2">✅</p>
+                <CheckCircle2 size={28} className="mx-auto mb-2 text-green" />
                 <p className="text-sm font-semibold text-text">All caught up</p>
                 <p className="text-xs text-muted">Accepted orders are in Orders with a QR tag.</p>
               </div>
@@ -204,7 +204,7 @@ export function QrAlerts({ open, setOpen, pollMs, compact = false }) {
             {msg}
             <button className="font-bold text-green2 hover:underline" onClick={() => { setOpen(true); toast.dismiss(t.id) }}>View</button>
           </span>
-        ), { id: 'qr-new', icon: call ? '🔔' : '📱', duration: 8000 })
+        ), { id: 'qr-new', icon: call ? <BellRing size={16} className="text-blue" /> : <QrCode size={16} className="text-amber" />, duration: 8000 })
       }
     }
     seen.current = new Set(keys)

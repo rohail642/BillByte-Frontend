@@ -5,7 +5,7 @@ import { getMenuItems, getCategories } from '../api/menu'
 import { getProfile } from '../api/auth'
 import { useAuthStore } from '../store/auth'
 import toast from 'react-hot-toast'
-import { LogOut, X, Plus, Minus, Search, ChefHat, UtensilsCrossed, ArrowLeft } from 'lucide-react'
+import { LogOut, X, Plus, Minus, Search, ChefHat, UtensilsCrossed, ArrowLeft, Receipt } from 'lucide-react'
 import { cancelOrderItem } from '../api/orders'
 import CancelItemModal from '../components/ui/CancelItemModal'
 
@@ -264,12 +264,12 @@ export default function WaiterView() {
             <button onClick={() => setMobileTab('menu')}
               className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all',
                 mobileTab === 'menu' ? 'bg-green text-white' : 'text-text2')}>
-              🍽️ Menu
+              <UtensilsCrossed size={14} className="inline -mt-0.5 mr-1" />Menu
             </button>
             <button onClick={() => setMobileTab('order')}
               className={clsx('flex-1 py-2 rounded-lg text-xs font-bold transition-all',
                 mobileTab === 'order' ? 'bg-green text-white' : 'text-text2')}>
-              🧾 Order {cart.length > 0 && (
+              <Receipt size={14} className="inline -mt-0.5 mr-1" />Order {cart.length > 0 && (
                 <span className="ml-1 bg-red text-white text-[9px] rounded-full w-4 h-4 inline-flex items-center justify-center">{cart.length}</span>
               )}
             </button>

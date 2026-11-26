@@ -18,7 +18,7 @@ export default function AIAssistant() {
   const { aiOpen, toggleAI } = useUIStore()
   const { user } = useAuthStore()
   const [msgs, setMsgs] = useState([
-    { role: 'bot', text: `Hi ${user?.name?.split(' ')[0] || 'there'}! 👋 I'm ByteAI. Ask me anything about your restaurant — sales, stock, or business advice.` }
+    { role: 'bot', text: `Hi ${user?.name?.split(' ')[0] || 'there'}, I'm ByteAI. Ask me anything about your restaurant — sales, stock, or business advice.` }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)

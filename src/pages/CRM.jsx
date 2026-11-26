@@ -9,7 +9,7 @@ import Modal from '../components/ui/Modal'
 import Input from '../components/ui/Input'
 import Spinner from '../components/ui/Spinner'
 import EmptyState from '../components/ui/EmptyState'
-import { Plus, Phone, Gift, TrendingUp, Users, Star, ChevronRight, ArrowLeft, ShoppingBag, Award } from 'lucide-react'
+import { Plus, Phone, Gift, TrendingUp, Users, Star, ChevronRight, ArrowLeft, ShoppingBag, Award, Receipt } from 'lucide-react'
 import { formatINR, initials, avatarColor } from '../utils'
 
 const SEGMENT = (visits) =>
@@ -54,7 +54,7 @@ export default function CRM() {
   const redeemMut = useMutation({
     mutationFn: ({ id, pts }) => redeemPoints(id, pts),
     onSuccess: (data) => {
-      toast.success(`✅ ${redeemPts} points redeemed = ₹${redeemPts} discount!`)
+      toast.success(`${redeemPts} points redeemed: ₹${redeemPts} discount`)
       refetch()
       qc.invalidateQueries({ queryKey: ['customerHistory', selected?.id] })
       setSelected(data) // update selected with new points
@@ -139,7 +139,7 @@ export default function CRM() {
               </h3>
               {loadingHistory ? <div className="flex justify-center py-6"><Spinner /></div>
                 : orders.length === 0
-                  ? <EmptyState icon="🧾" title="No orders yet" description="Orders will appear here once the customer places an order" />
+                  ? <EmptyState icon={<Receipt />} title="No orders yet" description="Orders will appear here once the customer places an order" />
                   : (
                     <div className="space-y-2">
                       {orders.map(o => (
@@ -182,7 +182,7 @@ export default function CRM() {
               </h3>
               {loadingHistory ? <div className="flex justify-center py-4"><Spinner /></div>
                 : loyalty.length === 0
-                  ? <EmptyState icon="⭐" title="No points yet" description="Points are earned automatically on every paid order" />
+                  ? <EmptyState icon={<Star />} title="No points yet" description="Points are earned automatically on every paid order" />
                   : (
                     <div className="space-y-1.5">
                       {loyalty.map(t => (
@@ -205,7 +205,7 @@ export default function CRM() {
         </div>
 
         {/* Redeem modal */}
-        <Modal open={redeemModal} onClose={() => setRedeemModal(false)} title="🎁 Redeem Loyalty Points">
+        <Modal open={redeemModal} onClose={() => setRedeemModal(false)} title="Redeem Loyalty Points">
           <div className="space-y-4">
             <div className="bg-green-dim border border-green/20 rounded-xl p-4 text-center">
               <p className="text-xs text-green2 mb-1">Available Points</p>
@@ -263,7 +263,7 @@ export default function CRM() {
       {/* Search + Add */}
       <div className="flex gap-3">
         <input className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-green transition-all"
-          placeholder="🔍 Search by name or phone..."
+          placeholder="Search by name or phone..."
           value={search} onChange={e => setSearch(e.target.value)} />
         <Button variant="primary" size="sm" icon={<Plus size={14}/>} onClick={() => { setForm({}); setAddModal(true) }}>
           Add Customer
@@ -273,7 +273,7 @@ export default function CRM() {
       {/* Customer list */}
       {isLoading ? <div className="flex justify-center py-12"><Spinner size="lg" /></div>
         : (customers || []).length === 0
-          ? <EmptyState icon="👥" title="No customers yet" description="Add customers to track their visits and reward loyalty" />
+          ? <EmptyState icon={<Users />} title="No customers yet" description="Add customers to track their visits and reward loyalty" />
           : (
             <div className="space-y-2">
               {(customers || []).map((c, i) => {
@@ -323,7 +323,7 @@ export default function CRM() {
           )}
 
       {/* Add customer modal */}
-      <Modal open={addModal} onClose={() => setAddModal(false)} title="➕ Add Customer"
+      <Modal open={addModal} onClose={() => setAddModal(false)} title="Add Customer"
         footer={<>
           <Button variant="secondary" onClick={() => setAddModal(false)}>Cancel</Button>
           <Button variant="primary" loading={createMut.isPending}

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Menu, Bell, TrendingUp, Plus } from 'lucide-react'
+import { Menu, Bell, TrendingUp, Plus, Package, Clock, ChefHat, BellRing, QrCode, CheckCircle2 } from 'lucide-react'
 import { useUIStore } from '../../store/ui'
 import { useAuthStore } from '../../store/auth'
 import { getAlerts } from '../../api/inventory'
@@ -67,7 +67,7 @@ export default function Topbar() {
     notifications.push({
       id: 'low-stock',
       type: 'warning',
-      icon: '📦',
+      icon: <Package size={15} />,
       title: `${alerts.low_stock_count} item${alerts.low_stock_count > 1 ? 's' : ''} running low`,
       desc: alerts.low_stock_items.slice(0, 3).map(i => typeof i === 'string' ? i : i.name).join(', ') + (alerts.low_stock_items.length > 3 ? '...' : ''),
       action: () => { navigate('/inventory'); setOpen(false) },
@@ -79,7 +79,7 @@ export default function Topbar() {
     notifications.push({
       id: 'expiring',
       type: 'danger',
-      icon: '⏰',
+      icon: <Clock size={15} />,
       title: `${alerts.expiring_soon_count} item${alerts.expiring_soon_count > 1 ? 's' : ''} expiring soon`,
       desc: alerts.expiring_items.slice(0, 2).map(i => typeof i === 'string' ? i : i.name).join(', '),
       action: () => { navigate('/inventory'); setOpen(false) },
@@ -92,7 +92,7 @@ export default function Topbar() {
     notifications.push({
       id: 'pending-orders',
       type: 'info',
-      icon: '🍽️',
+      icon: <ChefHat size={15} />,
       title: `${pendingCount} active order${pendingCount > 1 ? 's' : ''} in kitchen`,
       desc: (summary?.kot_pending_numbers || []).join(', '),
       action: () => { navigate('/orders'); setOpen(false) },
@@ -104,7 +104,7 @@ export default function Topbar() {
     notifications.unshift({
       id: 'qr-calls',
       type: 'warning',
-      icon: '🔔',
+      icon: <BellRing size={15} />,
       title: `${qrCalls} table${qrCalls > 1 ? 's' : ''} calling for a waiter or the bill`,
       desc: 'Tap to see which tables',
       action: () => { setQrOpen(true); setOpen(false) },
@@ -114,7 +114,7 @@ export default function Topbar() {
     notifications.unshift({
       id: 'qr-pending',
       type: 'warning',
-      icon: '📱',
+      icon: <QrCode size={15} />,
       title: `${qrPending} table order${qrPending > 1 ? 's' : ''} waiting for confirmation`,
       desc: 'Guests ordered by scanning the table QR',
       action: () => { setQrOpen(true); setOpen(false) },
@@ -171,7 +171,7 @@ export default function Topbar() {
 
               {notifications.length === 0 ? (
                 <div className="px-4 py-8 text-center">
-                  <p className="text-2xl mb-2">✅</p>
+                  <CheckCircle2 size={28} className="mx-auto mb-2 text-green" />
                   <p className="text-sm font-semibold text-text">All good!</p>
                   <p className="text-xs text-muted">No alerts right now</p>
                 </div>
@@ -180,7 +180,7 @@ export default function Topbar() {
                   {notifications.map(n => (
                     <button key={n.id} onClick={n.action}
                       className="w-full flex items-start gap-3 px-4 py-3 hover:bg-surface2 transition-colors text-left">
-                      <span className="text-lg flex-shrink-0 mt-0.5">{n.icon}</span>
+                      <span className="w-7 h-7 rounded-lg bg-surface2 text-text2 flex items-center justify-center flex-shrink-0">{n.icon}</span>
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-text">{n.title}</p>
                         {n.desc && <p className="text-[10px] text-muted mt-0.5 truncate">{n.desc}</p>}
