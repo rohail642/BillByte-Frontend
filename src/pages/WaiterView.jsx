@@ -22,6 +22,8 @@ import { clsx } from 'clsx'
 import { formatINR, printKOTElectron, isNativeApp } from '../utils'
 import { KOTModal } from '../components/ui/KOTView'
 import { QrAlerts } from '../components/qr/QrRequests'
+import KotGroupHeader from '../components/orders/KotGroupHeader'
+import { kotGroups } from '../components/orders/kotGroups'
 
 export default function WaiterView() {
   const { user, restaurantName, clearAuth, token } = useAuthStore()
@@ -151,6 +153,8 @@ export default function WaiterView() {
 
   const cartTotal = cart.reduce((sum, c) => sum + c.price * c.qty, 0)
   const existingItems = tableOrder?.items || []
+  // One block per order round (KOT), labelled with who placed it.
+  const groups = useMemo(() => kotGroups(tableOrder), [tableOrder])
 
   // Each section owns custom-named tables (strings). Legacy fallback: numeric 1..table_count.
   const rawSections = profile?.table_sections || []
@@ -278,16 +282,19 @@ export default function WaiterView() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-4">
-              {/* Existing order items */}
+              {/* Existing order — one block per order round (KOT), labelled with who placed it */}
               {existingItems.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">Current Order</p>
-                  <div className="space-y-1">
-                    {existingItems.map((item, i) => {
+                <div className="space-y-3">
+                  {groups.map(g => (
+                    <div key={g.kot} className="rounded-lg border border-border bg-bg2/60">
+                      <KotGroupHeader group={g} multiple={groups.length > 1} />
+                      <div className="px-2.5 pb-1.5 space-y-0.5">
+                    {g.items.map((item, i) => {
                       const isCancelled = !!item.cancelled_at
                       const isCancelling = cancelItemMut.isPending && cancelItemMut.variables?.itemId === item.id
                       return (
-                        <div key={item.id || i} className={clsx('flex items-center gap-1 text-sm py-1', isCancelled && 'opacity-40')}>
+                        <div key={item.id || i} className={clsx('text-sm py-1', isCancelled && 'opacity-40')}>
+                        <div className="flex items-center gap-1">
                           <span className={clsx('text-text2 flex-1 truncate', isCancelled && 'line-through')}>{item.name}</span>
                           <span className="text-muted">×{item.quantity}</span>
                           <span className="text-text font-medium w-16 text-right">{formatINR(item.price * item.quantity)}</span>
@@ -311,9 +318,13 @@ export default function WaiterView() {
                             <span className="ml-1 text-[9px] font-bold uppercase text-red flex-shrink-0">Void</span>
                           )}
                         </div>
+                        {item.notes && <p className="text-[11px] text-amber pl-1">↳ {item.notes}</p>}
+                        </div>
                       )
                     })}
-                  </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 

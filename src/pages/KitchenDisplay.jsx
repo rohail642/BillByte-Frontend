@@ -226,6 +226,7 @@ function KotCard({ card, onAdvance, isLoading }) {
                 voided ? 'line-through text-red opacity-60' : 'text-text'
               )}>
                 {item.name}
+                {item.notes && !voided && <span className="text-[11px] font-medium text-amber">({item.notes})</span>}
                 {voided && (
                   <span className="text-[9px] font-bold uppercase text-red not-italic opacity-100 bg-red-dim px-1 py-0.5 rounded">
                     Cancelled
@@ -243,9 +244,10 @@ function KotCard({ card, onAdvance, isLoading }) {
         })}
       </ul>
 
-      {order.notes && (
+      {/* This round's own note (kot_info); older orders only have order.notes */}
+      {(order.kot_info ? order.kot_info[String(kotNumber)]?.note : order.notes) && (
         <p className="mx-4 mb-3 text-xs text-muted bg-surface2 rounded-lg px-3 py-2">
-          📝 {order.notes}
+          📝 {order.kot_info ? order.kot_info[String(kotNumber)]?.note : order.notes}
         </p>
       )}
 

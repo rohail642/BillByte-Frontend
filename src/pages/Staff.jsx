@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Plus, Users, CalendarCheck, Wallet } from 'lucide-react'
@@ -24,8 +25,13 @@ const TABS = [
 
 export default function Staff() {
   const qc = useQueryClient()
-  const [tab, setTab] = useState('team')
-  const [openId, setOpenId] = useState(null)
+  // Tab and open profile live in the URL (/staff?tab=salary&id=3), so the
+  // sidebar's "Staff" link (plain /staff) always returns to the main page and
+  // the back button steps between tabs / out of a profile.
+  const [params, setParams] = useSearchParams()
+  const tab = TABS.some(([id]) => id === params.get('tab')) ? params.get('tab') : 'team'
+  const openId = params.get('id') ? Number(params.get('id')) : null
+  const setTab = id => setParams(id === 'team' ? {} : { tab: id })
   const [fallback, setFallback] = useState(null) // removed staff opened from the Salary tab
   const [adding, setAdding] = useState(false)
 
@@ -43,8 +49,12 @@ export default function Staff() {
     onError: e => toast.error(String(e)),
   })
 
-  const open = (id, fb = null) => { setOpenId(id); setFallback(fb) }
-  const member = openId != null ? (staff.find(s => s.id === openId) || fallback) : null
+  const open = (id, fb = null) => {
+    setFallback(fb)
+    const next = tab === 'team' ? {} : { tab }
+    setParams(id == null ? next : { ...next, id: String(id) })
+  }
+  const member = openId != null ? (staff.find(s => s.id === openId) || (fallback?.id === openId ? fallback : null)) : null
   if (member) return <StaffProfile key={member.id} member={member} onBack={() => open(null)} />
 
   const count = s => staff.filter(m => m.status === s).length

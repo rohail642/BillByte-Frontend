@@ -29,10 +29,29 @@ export default function AttendanceSheet({ onOpen }) {
     qc.invalidateQueries({ queryKey: ['attendance'] })
     qc.invalidateQueries({ queryKey: ['payroll'] })
   }
+  // Optimistic: the tap shows instantly and saves in the background, so the
+  // owner can mark one person after another without waiting on the server.
+  // Rolls back (with a message) if the save fails. Data is re-fetched only
+  // once the last pending save finishes, so quick taps never flicker back.
   const save = useMutation({
-    mutationFn: entries => markBulk(current, entries),
-    onSuccess: refresh,
-    onError: e => toast.error(String(e)),
+    mutationKey: ['markAttendance'],
+    mutationFn: ({ date, entries }) => markBulk(date, entries),
+    onMutate: async ({ entries }) => {
+      const key = ['staffDay', day]
+      await qc.cancelQueries({ queryKey: key })
+      const prev = qc.getQueryData(key)
+      const next = Object.fromEntries(entries.map(e => [e.staff_id, e.status]))
+      qc.setQueryData(key, old => old && {
+        ...old,
+        staff: old.staff.map(r => (r.staff_id in next ? { ...r, status: next[r.staff_id] || 'unmarked' } : r)),
+      })
+      return { key, prev }
+    },
+    onError: (e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(ctx.key, ctx.prev)
+      toast.error(`Couldn't save: ${String(e)}`)
+    },
+    onSettled: () => { if (qc.isMutating({ mutationKey: ['markAttendance'] }) <= 1) refresh() },
   })
 
   const rows = data?.staff || []
@@ -40,9 +59,9 @@ export default function AttendanceSheet({ onOpen }) {
   const remaining = markable.filter(r => r.status === 'unmarked')
   const counts = Object.fromEntries(Object.keys(STATUS).map(k => [k, markable.filter(r => r.status === k).length]))
 
-  const setStatus = (r, s) => save.mutate([{ staff_id: r.staff_id, status: r.status === s ? null : s }])
+  const setStatus = (r, s) => save.mutate({ date: current, entries: [{ staff_id: r.staff_id, status: r.status === s ? null : s }] })
   const markRemaining = () => {
-    save.mutate(remaining.map(r => ({ staff_id: r.staff_id, status: 'present' })), {
+    save.mutate({ date: current, entries: remaining.map(r => ({ staff_id: r.staff_id, status: 'present' })) }, {
       onSuccess: () => toast.success(`${remaining.length} marked present`),
     })
   }
@@ -85,7 +104,7 @@ export default function AttendanceSheet({ onOpen }) {
         <div className="ml-auto flex gap-2">
           <Button variant="secondary" size="sm" icon={<Download size={13} />} onClick={exportMonth}>Month CSV</Button>
           <Button variant="primary" size="sm" icon={<CheckCheck size={14} />} disabled={!remaining.length}
-            loading={save.isPending && save.variables?.length > 1} onClick={markRemaining}>
+            onClick={markRemaining}>
             Mark {remaining.length ? `${remaining.length} remaining` : 'remaining'} present
           </Button>
         </div>
@@ -120,7 +139,6 @@ export default function AttendanceSheet({ onOpen }) {
                 <div className="flex gap-1">
                   {MARKABLE.map(s => (
                     <button key={s} title={STATUS[s].label}
-                      disabled={save.isPending}
                       onClick={() => setStatus(r, s)}
                       className={clsx('min-w-[44px] sm:min-w-[72px] px-2 py-1.5 rounded-lg text-xs font-bold border transition-colors',
                         r.status === s ? STATUS[s].btn : 'bg-surface2 text-text3 border-border hover:border-green hover:text-green2')}>

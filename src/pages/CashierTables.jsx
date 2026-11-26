@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
+import KotGroupHeader from '../components/orders/KotGroupHeader'
+import { kotGroups } from '../components/orders/kotGroups'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getActiveTables, getTableOrder, createOrder, addItemsToOrder, updateStatus, removeOrderItem, collectPayment, cancelOrderItem, retryCancelNotify } from '../api/orders'
 import { getMenuItems, getCategories } from '../api/menu'
@@ -228,6 +230,7 @@ export default function CashierTables() {
   // Never show items from a paid order even if the cache is stale
   const activeTableOrder = (tableOrder && tableOrder.status !== 'paid') ? tableOrder : null
   const existingItems = activeTableOrder?.items || []
+  const groups = kotGroups(activeTableOrder)  // one block per order round (KOT)
 
   // Each section owns custom-named tables (strings). Legacy fallback: numeric 1..table_count.
   const rawSections = profile?.table_sections || []
@@ -329,14 +332,17 @@ export default function CashierTables() {
 
             <div className="flex-1 overflow-y-auto p-3 space-y-4">
               {existingItems.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">Current Order</p>
-                  <div className="space-y-1">
-                    {existingItems.map((item) => {
+                <div className="space-y-3">
+                  {groups.map(g => (
+                    <div key={g.kot} className="rounded-lg border border-border bg-bg2/60">
+                      <KotGroupHeader group={g} multiple={groups.length > 1} />
+                      <div className="px-2.5 pb-1.5 space-y-0.5">
+                    {g.items.map((item) => {
                       const isCancelled = !!item.cancelled_at
                       const isCancelling = cancelItemMut.isPending && cancelItemMut.variables?.itemId === item.id
                       return (
-                        <div key={item.id} className={clsx('flex items-center gap-1 text-sm py-1', isCancelled && 'opacity-40')}>
+                        <div key={item.id} className={clsx('text-sm py-1', isCancelled && 'opacity-40')}>
+                        <div className="flex items-center gap-1">
                           <span className={clsx('text-text2 flex-1 truncate', isCancelled && 'line-through')}>{item.name}</span>
                           <span className="text-muted">×{item.quantity}</span>
                           <span className="text-text font-medium w-16 text-right">{formatINR(item.price * item.quantity)}</span>
@@ -360,9 +366,13 @@ export default function CashierTables() {
                             <span className="ml-1 text-[9px] font-bold uppercase text-red flex-shrink-0">Void</span>
                           )}
                         </div>
+                        {item.notes && <p className="text-[11px] text-amber pl-1">↳ {item.notes}</p>}
+                        </div>
                       )
                     })}
-                  </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 

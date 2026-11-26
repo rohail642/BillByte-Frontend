@@ -532,11 +532,29 @@ function GuestOrderPage({ token }) {
               <section className="rounded-xl bg-bg2 border border-border p-4">
                 <h2 className="font-display font-bold mb-0.5">Table bill</h2>
                 <p className="text-[11px] text-text3 mb-2">Everything ordered at this table, by anyone</p>
-                <ul className="text-sm space-y-1">
-                  {bill.items.map((it, j) => (
-                    <li key={j} className="flex justify-between"><span>{it.quantity} × {it.name}</span><span className="tabular-nums">{inr(it.total)}</span></li>
-                  ))}
-                </ul>
+                {bill.groups?.length > 1 ? (
+                  // Several people ordered: show each person's order, then the combined total.
+                  <div className="space-y-3">
+                    {bill.groups.map(g => (
+                      <div key={g.label} className="rounded-lg bg-bg px-3 py-2">
+                        <div className="flex justify-between text-xs font-bold text-text2 mb-1">
+                          <span>{g.label}</span><span className="tabular-nums">{inr(g.total)}</span>
+                        </div>
+                        <ul className="text-sm space-y-0.5">
+                          {g.items.map((it, j) => (
+                            <li key={j} className="flex justify-between"><span>{it.quantity} × {it.name}</span><span className="tabular-nums text-text2">{inr(it.total)}</span></li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <ul className="text-sm space-y-1">
+                    {bill.items.map((it, j) => (
+                      <li key={j} className="flex justify-between"><span>{it.quantity} × {it.name}</span><span className="tabular-nums">{inr(it.total)}</span></li>
+                    ))}
+                  </ul>
+                )}
                 <div className="border-t border-border mt-3 pt-2 text-sm space-y-1">
                   <div className="flex justify-between text-text3"><span>Subtotal</span><span className="tabular-nums">{inr(bill.subtotal)}</span></div>
                   {bill.discount_amount > 0 && <div className="flex justify-between text-text3"><span>Discount</span><span className="tabular-nums">−{inr(bill.discount_amount)}</span></div>}
