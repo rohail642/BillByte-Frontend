@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import DishMark from '../components/menu/DishMark'
+import DishPhoto from '../components/menu/DishPhoto'
 import { useParams } from 'react-router-dom'
 import { Search, Plus, Minus, ShoppingBag, X, Check, Clock, ChefHat, Bell, BellRing, Receipt, CircleX, Loader2, Users, Banknote, CreditCard } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -129,15 +131,6 @@ function PaySheet({ bill, busy, onClose, onUpi, onCounter }) {
   )
 }
 
-function FoodDot({ type }) {
-  const nonVeg = type === 'non_veg' || type === 'egg'
-  return (
-    <span className={clsx('inline-flex w-3.5 h-3.5 border-[1.5px] items-center justify-center rounded-[3px] flex-shrink-0',
-      nonVeg ? 'border-red' : 'border-green')}>
-      <span className={clsx('w-1.5 h-1.5 rounded-full', nonVeg ? 'bg-red' : 'bg-green')} />
-    </span>
-  )
-}
 
 // Which bills this phone watched while unpaid, and which "Paid" moments it has
 // already celebrated — so the animation plays once, only for a payment the
@@ -450,12 +443,12 @@ function GuestOrderPage({ token }) {
               return (
                 <li key={i.id} className="py-3.5 flex gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2"><FoodDot type={i.food_type} /><h3 className="font-semibold text-[15px] leading-tight">{i.name}</h3></div>
+                    <div className="flex items-center gap-2"><DishMark type={i.food_type} /><h3 className="font-semibold text-[15px] leading-tight">{i.name}</h3></div>
                     <p className="text-sm font-semibold mt-1 tabular-nums">{inr(i.price)}</p>
                     {i.description && <p className="text-xs text-text3 mt-1 line-clamp-2">{i.description}</p>}
                   </div>
                   <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                    <div className="text-3xl leading-none">{i.emoji}</div>
+                    <DishPhoto item={i} className="w-24 h-20 rounded-xl" />
                     {n === 0 ? (
                       <button onClick={() => setQty(i.id, 1)}
                         className="w-20 py-1.5 rounded-lg border border-green text-green text-xs font-bold bg-green-dim">ADD</button>
@@ -618,7 +611,7 @@ function GuestOrderPage({ token }) {
             <ul className="px-4 divide-y divide-border">
               {lines.map(({ item, qty }) => (
                 <li key={item.id} className="py-3 flex items-center gap-3">
-                  <FoodDot type={item.food_type} />
+                  <DishMark type={item.food_type} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{item.name}</p>
                     <p className="text-xs text-text3 tabular-nums">{inr(item.price)}</p>

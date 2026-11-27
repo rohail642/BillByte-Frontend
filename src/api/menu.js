@@ -13,3 +13,10 @@ export const importMenuFromExcel = (file) => {
   // Do NOT set Content-Type manually — the browser must add the multipart boundary.
   return client.post('/menu/import-excel', fd)
 }
+// Dish photo (already compressed in the browser) — owner/manager only.
+export const uploadMenuItemPhoto = (id, blob) => {
+  const fd = new FormData()
+  fd.append('file', blob, blob.type === 'image/webp' ? 'photo.webp' : 'photo.jpg')
+  return client.put(`/menu/items/${id}/image`, fd)
+}
+export const deleteMenuItemPhoto = id => client.delete(`/menu/items/${id}/image`)

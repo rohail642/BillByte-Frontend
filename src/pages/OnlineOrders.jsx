@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import DishMark from '../components/menu/DishMark'
 import PayIcon from '../components/ui/PayIcon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getOrders, createOrder, updateStatus, collectPayment } from '../api/orders'
@@ -416,7 +417,7 @@ export default function OnlineOrders() {
               {filteredMenu.map(item => (
                 <button key={item.id} onClick={() => addToCart(item)}
                   className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-green-dim hover:border-green/30 border border-transparent transition-all text-left">
-                  <span className="text-base flex-shrink-0">{item.emoji}</span>
+                  <DishMark type={item.food_type} size={12} />
                   <span className="flex-1 text-sm text-text font-medium">{item.name}</span>
                   <span className="text-xs font-bold text-green2 flex-shrink-0">{formatINR(item.price)}</span>
                   <Plus size={14} className="text-muted flex-shrink-0"/>

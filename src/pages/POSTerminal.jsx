@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import DishPhoto from '../components/menu/DishPhoto'
+import DishMark from '../components/menu/DishMark'
 import PayIcon from '../components/ui/PayIcon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMenuItems, getCategories } from '../api/menu'
@@ -348,13 +350,15 @@ export default function POSTerminal() {
                       onClick={() => {
                         if (outOfStock) { toast.error(`${item.name} is out of stock`); return }
                         if (tracked && inCartQty >= item.stock_qty) { toast.error(`Only ${item.stock_qty} left in stock`); return }
-                        cart.addItem({ id: item.id, name: item.name, price: item.price, emoji: item.emoji, cat: item.category_id, stock: item.stock_qty })
+                        cart.addItem({ id: item.id, name: item.name, price: item.price, food_type: item.food_type, cat: item.category_id, stock: item.stock_qty })
                       }}
                       className={clsx('bg-surface2 border border-border rounded-xl p-3 text-center transition-all',
                         outOfStock
                           ? 'opacity-45 cursor-not-allowed'
                           : 'hover:border-green/40 hover:bg-green-dim hover:shadow-sm active:scale-95 cursor-pointer')}>
-                      <div className="text-2xl mb-1.5">{item.emoji}</div>
+                      {item.image_version
+                        ? <DishPhoto item={item} className="w-full h-14 rounded-lg mb-1.5" />
+                        : <div className="flex justify-center mb-1.5"><DishMark type={item.food_type} /></div>}
                       <p className="text-xs font-semibold text-text leading-tight mb-0.5">{item.name}</p>
                       <p className="text-xs font-bold text-green2">₹{item.price}</p>
                       {tracked && (
@@ -461,7 +465,7 @@ export default function POSTerminal() {
               ) : (
                 cart.items.map(item => (
                   <div key={item.id} className="flex items-center gap-2 p-2.5 bg-surface2 rounded-lg">
-                    <span className="text-base">{item.emoji}</span>
+                    <DishMark type={item.food_type} size={12} />
                     <p className="flex-1 text-xs font-semibold text-text min-w-0 truncate">{item.name}</p>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button onClick={() => cart.removeItem(item.id)} className="w-5 h-5 rounded-full bg-surface3 flex items-center justify-center hover:bg-border2 transition-colors">

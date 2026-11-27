@@ -1,6 +1,9 @@
 import { useState, useRef } from 'react'
+import PhotoField from '../components/menu/PhotoField'
+import DishPhoto from '../components/menu/DishPhoto'
+import DishMark from '../components/menu/DishMark'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMenuItems, getCategories, createMenuItem, updateMenuItem, deleteMenuItem, createCategory, deleteCategory, importMenuFromExcel, clearEntireMenu } from '../api/menu'
+import { getMenuItems, getCategories, createMenuItem, updateMenuItem, deleteMenuItem, createCategory, deleteCategory, importMenuFromExcel, clearEntireMenu, uploadMenuItemPhoto, deleteMenuItemPhoto } from '../api/menu'
 import { getInventory } from '../api/inventory'
 import { getRecipes, saveRecipe, deleteRecipe } from '../api/recipes'
 import toast from 'react-hot-toast'
@@ -45,8 +48,18 @@ export default function Menu() {
   const refetch = () => qc.invalidateQueries({ queryKey: ['menuItems'] })
   const refetchRecipes = () => qc.invalidateQueries({ queryKey: ['recipes'] })
 
-  const createMut  = useMutation({ mutationFn: createMenuItem, onSuccess: () => { toast.success('Item added!');   refetch(); setItemModal(null) }, onError: e => toast.error(String(e)) })
-  const updateMut  = useMutation({ mutationFn: ({id,...b}) => updateMenuItem(id,b), onSuccess: () => { toast.success('Item updated!'); refetch(); setItemModal(null) }, onError: e => toast.error(String(e)) })
+  // Save the dish, then its photo change (if any): new Blob → upload, 'remove' → delete.
+  const applyPhoto = async (id, photo) => {
+    if (photo instanceof Blob) await uploadMenuItemPhoto(id, photo)
+    else if (photo === 'remove') await deleteMenuItemPhoto(id)
+  }
+  const photoFailed = e => toast.error(`Dish saved, but the photo couldn't be saved: ${String(e)}`)
+  const createMut  = useMutation({
+    mutationFn: async ({ photo, ...b }) => { const it = await createMenuItem(b); await applyPhoto(it.id, photo).catch(photoFailed); return it },
+    onSuccess: () => { toast.success('Item added'); refetch(); setItemModal(null) }, onError: e => toast.error(String(e)) })
+  const updateMut  = useMutation({
+    mutationFn: async ({ id, photo, ...b }) => { const it = await updateMenuItem(id, b); await applyPhoto(id, photo).catch(photoFailed); return it },
+    onSuccess: () => { toast.success('Item updated'); refetch(); setItemModal(null) }, onError: e => toast.error(String(e)) })
   const deleteMut  = useMutation({ mutationFn: deleteMenuItem, onSuccess: () => { toast.success('Item deleted!'); refetch() }, onError: e => toast.error(String(e)) })
   const toggleMut  = useMutation({ mutationFn: ({id,active}) => updateMenuItem(id,{is_active:active}), onSuccess: () => refetch(), onError: e => toast.error(String(e)) })
   const stockMut   = useMutation({ mutationFn: ({id,stock_qty}) => updateMenuItem(id,{stock_qty}), onSuccess: () => refetch(), onError: e => toast.error(String(e)) })
@@ -123,7 +136,7 @@ export default function Menu() {
   const recipeMap = {} // menuItemId → recipe
   ;(recipes||[]).forEach(r => { recipeMap[r.menu_item_id] = r })
 
-  const openAddItem  = () => { setForm({ emoji:'🍽️', food_type:'veg', is_active:true, track_stock:false, stock_qty:'' }); setItemModal('add') }
+  const openAddItem  = () => { setForm({ food_type:'veg', is_active:true, track_stock:false, stock_qty:'' }); setItemModal('add') }
   const openEditItem = (item) => { setForm({ ...item, track_stock: item.stock_qty != null, stock_qty: item.stock_qty ?? '' }); setItemModal(item) }
 
   const openRecipeModal = (item) => {
@@ -222,7 +235,9 @@ export default function Menu() {
                       <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface2 transition-colors group">
                         <td className="py-3 px-2 pl-0">
                           <div className="flex items-center gap-2.5">
-                            <span className="text-lg">{item.emoji}</span>
+                            {item.image_version
+                              ? <DishPhoto item={item} className="w-9 h-9 rounded-lg flex-shrink-0" />
+                              : <DishMark type={item.food_type} />}
                             <span className="font-semibold text-text">{item.name}</span>
                           </div>
                         </td>
@@ -319,7 +334,9 @@ export default function Menu() {
                   <Card key={recipe.id} hover>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">{menuItem?.emoji || '🍽️'}</span>
+                        {menuItem?.image_version
+                          ? <DishPhoto item={menuItem} className="w-9 h-9 rounded-lg flex-shrink-0" />
+                          : <DishMark type={menuItem?.food_type} size={16} />}
                         <div>
                           <p className="font-display font-bold text-sm text-text">{recipe.menu_item_name}</p>
                           <p className="text-[11px] text-muted">{recipe.ingredients.length} ingredients</p>
@@ -469,17 +486,14 @@ export default function Menu() {
             onClick={() => {
               if (!form.name || !form.price) { toast.error('Name and price required'); return }
               const stockQty = form.track_stock ? Math.max(0, Number(form.stock_qty) || 0) : null
-              if (itemModal === 'add') createMut.mutate({ name:form.name, price:Number(form.price), emoji:form.emoji, food_type:form.food_type, category_id:form.category_id||null, is_active:true, stock_qty:stockQty })
-              else updateMut.mutate({ id:itemModal.id, name:form.name, price:Number(form.price), emoji:form.emoji, food_type:form.food_type, category_id:form.category_id||null, stock_qty:stockQty })
+              if (itemModal === 'add') createMut.mutate({ name:form.name, price:Number(form.price), food_type:form.food_type, category_id:form.category_id||null, is_active:true, stock_qty:stockQty, photo:form.photo })
+              else updateMut.mutate({ id:itemModal.id, name:form.name, price:Number(form.price), food_type:form.food_type, category_id:form.category_id||null, stock_qty:stockQty, photo:form.photo })
             }}>
             {itemModal === 'add' ? 'Add Item' : 'Save Changes'}
           </Button>
         </>}>
         <div className="space-y-3">
-          <div className="grid grid-cols-4 gap-2">
-            <Input label="Emoji" value={form.emoji||''} onChange={e=>set('emoji',e.target.value)} maxLength={2} className="text-center text-xl" />
-            <div className="col-span-3"><Input label="Item Name" placeholder="e.g. Butter Chicken" value={form.name||''} onChange={e=>set('name',e.target.value)} /></div>
-          </div>
+          <Input label="Item Name" placeholder="e.g. Butter Chicken" value={form.name||''} onChange={e=>set('name',e.target.value)} />
           <div className="grid grid-cols-2 gap-2">
             <Input label="Price (₹)" type="number" placeholder="280" value={form.price||''} onChange={e=>set('price',e.target.value)} />
             <Select label="Type" value={form.food_type||'veg'} onChange={e=>set('food_type',e.target.value)}>
@@ -494,6 +508,8 @@ export default function Menu() {
             <option value="">No category</option>
             {(categories||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
+          <PhotoField key={itemModal === 'add' ? 'new' : itemModal?.id} item={itemModal === 'add' ? null : itemModal}
+            foodType={form.food_type || 'veg'} value={form.photo} onChange={v => set('photo', v)} />
           <Toggle
             label="Track stock count"
             description="Reduces by 1 every time this item is ordered. Item shows as out of stock at 0."
